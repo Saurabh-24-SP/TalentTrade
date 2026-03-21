@@ -1,0 +1,63 @@
+const express = require("express");
+const router = express.Router();
+const { Message } = require("../models/Others");
+const { protect } = require("../middleware/authMiddleware");
+
+// ✅ MESSAGES DEKHO
+// GET /api/messages/:userId
+router.get("/:userId", protect, async (req, res) => {
+    try {
+        const messages = await Message.find({
+            $or: [
+                { sender: req.user._id, receiver: req.params.userId },
+                { sender: req.params.userId, receiver: req.user._id },
+            ],
+        }).sort({ createdAt: 1 });
+
+        return res.json(messages);
+
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+});
+
+// ✅ MESSAGE BHEJO
+// POST /api/messages/send
+router.post("/send", protect, async (req, res) => {
+    try {
+        const { receiverId, text } = req.body;
+
+        if (!receiverId || !text) {
+            return res.status(400).json({ message: "ReceiverId aur text required hai" });
+        }
+
+        const message = await Message.create({
+            sender: req.user._id,
+            receiver: receiverId,
+            text,
+        });
+
+        return res.status(201).json(message);
+
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+});
+
+// ✅ MESSAGE READ MARK KARO
+// PUT /api/messages/read/:userId
+router.put("/read/:userId", protect, async (req, res) => {
+    try {
+        await Message.updateMany(
+            { sender: req.params.userId, receiver: req.user._id, isRead: false },
+            { isRead: true }
+        );
+
+        return res.json({ message: "Messages read marked ✅" });
+
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+});
+
+module.exports = router;
