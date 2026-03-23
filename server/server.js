@@ -11,12 +11,23 @@ connectDB();
 
 const app = express();
 const server = http.createServer(app);
+
+// CORS configuration for development
+const allowedOrigins = (process.env.ALLOW_ORIGINS || "http://localhost:5173,http://localhost:3000").split(",");
+
 const io = new Server(server, {
-    cors: { origin: process.env.CLIENT_URL, methods: ["GET", "POST"] },
+    cors: { 
+        origin: allowedOrigins, 
+        methods: ["GET", "POST"],
+        credentials: true
+    },
 });
 
 // Middleware
-app.use(cors({ origin: process.env.CLIENT_URL }));
+app.use(cors({ 
+    origin: allowedOrigins,
+    credentials: true 
+}));
 app.use(express.json());
 
 // ✅ Routes — sabhi ek jagah
