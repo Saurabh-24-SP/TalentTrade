@@ -12,22 +12,34 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration for development
-const allowedOrigins = (process.env.ALLOW_ORIGINS || "http://localhost:5173,http://localhost:3000").split(",");
+// CORS configuration for development and production
+const allowedOrigins = [
+    ...new Set(
+        [
+            ...(process.env.ALLOW_ORIGINS || "").split(","),
+            process.env.FRONTEND_URL,
+            process.env.CLIENT_URL,
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+            "https://talenttrade.saurabhtech.in",
+        ].filter(Boolean).map((origin) => origin.trim())
+    ),
+];
+
+const corsOptions = {
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+};
 
 const io = new Server(server, {
-    cors: { 
-        origin: allowedOrigins, 
-        methods: ["GET", "POST"],
-        credentials: true
-    },
+    cors: corsOptions,
 });
 
 // Middleware
-app.use(cors({ 
-    origin: allowedOrigins,
-    credentials: true 
-}));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // ✅ Routes — sabhi ek jagah
