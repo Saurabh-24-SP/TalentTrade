@@ -8,6 +8,12 @@ import { GlassCard, PageShell, Reveal, SectionHeading } from "../components/Prem
 export default function MyServices() {
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [activeServiceId, setActiveServiceId] = useState(null);
+    const [videoUrlDraft, setVideoUrlDraft] = useState("");
+    const [imageFiles, setImageFiles] = useState([]);
+    const [resourceFiles, setResourceFiles] = useState([]);
+    const [contentBusy, setContentBusy] = useState(false);
+    const [contentError, setContentError] = useState("");
 
     useEffect(() => {
         API.get("/services/my/listings")
@@ -33,6 +39,107 @@ export default function MyServices() {
             setServices(services.map((service) => (service._id === id ? { ...service, status: newStatus } : service)));
         } catch (err) {
             alert(err.response?.data?.message || "Update failed");
+        }
+    };
+
+    const resetDraft = () => {
+        setVideoUrlDraft("");
+        setImageFiles([]);
+        setResourceFiles([]);
+        setContentError("");
+    };
+
+    const toggleManager = (serviceId) => {
+        setActiveServiceId((prev) => {
+            const next = prev === serviceId ? null : serviceId;
+            resetDraft();
+            if (next) {
+                const current = services.find((s) => s._id === next);
+                setVideoUrlDraft(current?.videoUrl || "");
+            }
+            return next;
+        });
+    };
+
+    const saveVideoLink = async (serviceId, nextValue) => {
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const payloadUrl = typeof nextValue === "string" ? nextValue : videoUrlDraft;
+            const res = await API.put(`/services/update/${serviceId}`, { videoUrl: payloadUrl });
+            const savedUrl = res.data?.videoUrl ?? payloadUrl;
+            setServices((prev) => prev.map((s) => (s._id === serviceId ? { ...s, videoUrl: savedUrl } : s)));
+            setVideoUrlDraft(savedUrl);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Failed to update video link");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const uploadImages = async (serviceId) => {
+        if (!imageFiles.length) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const fd = new FormData();
+            imageFiles.forEach((file) => fd.append("images", file));
+            const res = await API.post(`/upload/service/${serviceId}`, fd, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            setServices((prev) => prev.map((s) => (s._id === serviceId ? { ...s, images: res.data?.images || s.images } : s)));
+            setImageFiles([]);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Image upload failed");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const uploadResources = async (serviceId) => {
+        if (!resourceFiles.length) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const fd = new FormData();
+            resourceFiles.forEach((file) => fd.append("files", file));
+            const res = await API.post(`/upload/service/${serviceId}/content`, fd, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            setServices((prev) => prev.map((s) => (s._id === serviceId ? { ...s, attachments: res.data?.attachments || s.attachments } : s)));
+            setResourceFiles([]);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "File upload failed");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const deleteServiceImage = async (serviceId, publicId) => {
+        if (!publicId) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const res = await API.delete(`/upload/service/${serviceId}/image`, { data: { publicId } });
+            setServices((prev) => prev.map((s) => (s._id === serviceId ? { ...s, images: res.data?.images || [] } : s)));
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Delete failed");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const deleteServiceAttachment = async (serviceId, publicId) => {
+        if (!publicId) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const res = await API.delete(`/upload/service/${serviceId}/content`, { data: { publicId } });
+            setServices((prev) => prev.map((s) => (s._id === serviceId ? { ...s, attachments: res.data?.attachments || [] } : s)));
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Delete failed");
+        } finally {
+            setContentBusy(false);
         }
     };
 
@@ -82,6 +189,12 @@ export default function MyServices() {
                                             <span>⏱ {service.hoursRequired}h</span>
                                             <span>📦 {service.totalBookings} bookings</span>
                                         </div>
+
+                                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold">🖼️ {(service.images || []).length}/5</span>
+                                            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold">📎 {(service.attachments || []).length}/15</span>
+                                            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold">🎥 {service.videoUrl ? "set" : "none"}</span>
+                                        </div>
                                     </div>
 
                                     <div className="ml-4 flex gap-2">
@@ -98,6 +211,12 @@ export default function MyServices() {
                                             View
                                         </Link>
                                         <button
+                                            onClick={() => toggleManager(service._id)}
+                                            className="rounded-2xl bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+                                        >
+                                            {activeServiceId === service._id ? "Hide content" : "Manage content"}
+                                        </button>
+                                        <button
                                             onClick={() => handleDelete(service._id)}
                                             className="rounded-2xl bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
                                         >
@@ -105,6 +224,158 @@ export default function MyServices() {
                                         </button>
                                     </div>
                                 </div>
+
+                                {activeServiceId === service._id && (
+                                    <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl">
+                                        <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 px-5 py-4">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Content manager</p>
+                                            <p className="mt-1 text-sm font-semibold text-slate-900">Add / edit / delete your media for this service</p>
+                                        </div>
+
+                                        <div className="p-5">
+                                            {contentError && (
+                                                <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                                    {contentError}
+                                                </div>
+                                            )}
+
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-4">
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Video link</p>
+                                                    <input
+                                                        type="url"
+                                                        placeholder="https://youtube.com/watch?v=... (optional)"
+                                                        value={videoUrlDraft}
+                                                        disabled={contentBusy}
+                                                        onChange={(e) => setVideoUrlDraft(e.target.value)}
+                                                        className="premium-input mt-3"
+                                                    />
+                                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => saveVideoLink(service._id)}
+                                                            disabled={contentBusy}
+                                                            className="premium-button px-5 py-2.5 text-xs"
+                                                        >
+                                                            Save
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => saveVideoLink(service._id, "")}
+                                                            disabled={contentBusy}
+                                                            className="premium-button premium-button-ghost px-5 py-2.5 text-xs"
+                                                        >
+                                                            Clear
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-4">
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upload</p>
+                                                    <div className="mt-3 space-y-3">
+                                                        <div>
+                                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Images (max 5)</p>
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                multiple
+                                                                disabled={contentBusy || (service.images || []).length >= 5}
+                                                                onChange={(e) => {
+                                                                    const remaining = Math.max(0, 5 - (service.images || []).length);
+                                                                    setImageFiles(Array.from(e.target.files || []).slice(0, remaining));
+                                                                }}
+                                                                className="premium-input mt-2"
+                                                            />
+                                                            <div className="mt-2 flex items-center justify-between gap-3">
+                                                                <p className="text-xs text-slate-500">Selected: <span className="font-semibold">{imageFiles.length}</span></p>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => uploadImages(service._id)}
+                                                                    disabled={contentBusy || !imageFiles.length}
+                                                                    className="premium-button px-4 py-2 text-xs"
+                                                                >
+                                                                    Upload
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">PDF / Video</p>
+                                                            <input
+                                                                type="file"
+                                                                accept="application/pdf,video/*"
+                                                                multiple
+                                                                disabled={contentBusy}
+                                                                onChange={(e) => setResourceFiles(Array.from(e.target.files || []).slice(0, 10))}
+                                                                className="premium-input mt-2"
+                                                            />
+                                                            <div className="mt-2 flex items-center justify-between gap-3">
+                                                                <p className="text-xs text-slate-500">Selected: <span className="font-semibold">{resourceFiles.length}</span></p>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => uploadResources(service._id)}
+                                                                    disabled={contentBusy || !resourceFiles.length}
+                                                                    className="premium-button px-4 py-2 text-xs"
+                                                                >
+                                                                    Upload
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {Array.isArray(service.images) && service.images.length > 0 && (
+                                                <div className="mt-6">
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current images</p>
+                                                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                                        {service.images.map((img) => (
+                                                            <div key={img.publicId || img.url} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                                                                {img.url && <img src={img.url} alt="Service" className="h-24 w-full object-cover" />}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => deleteServiceImage(service._id, img.publicId)}
+                                                                    disabled={contentBusy}
+                                                                    className="w-full px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {Array.isArray(service.attachments) && service.attachments.length > 0 && (
+                                                <div className="mt-6">
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current files</p>
+                                                    <div className="mt-3 space-y-2">
+                                                        {service.attachments.map((item) => (
+                                                            <div key={item.publicId || item.url} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                                                                <a
+                                                                    href={item.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700 hover:text-indigo-700"
+                                                                >
+                                                                    {item.originalName || item.url}
+                                                                </a>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => deleteServiceAttachment(service._id, item.publicId)}
+                                                                    disabled={contentBusy}
+                                                                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-60"
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </GlassCard>
                         ))}
                     </div>

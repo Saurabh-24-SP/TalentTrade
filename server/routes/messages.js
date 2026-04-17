@@ -1,7 +1,22 @@
 const express = require("express");
 const router = express.Router();
 const { Message } = require("../models/Others");
+const User = require("../models/User");
 const { protect } = require("../middleware/authMiddleware");
+
+// ✅ LIST CHAT CONTACTS (non-admin)
+// GET /api/messages/contacts
+router.get("/contacts", protect, async (req, res) => {
+    try {
+        const users = await User.find({ _id: { $ne: req.user._id } })
+            .select("name role avatar")
+            .sort({ name: 1 });
+
+        return res.json(users);
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+});
 
 // ✅ VIEW MESSAGES
 // GET /api/messages/:userId

@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import BrowseServices from "./pages/BrowseServices";
 import ServiceDetail from "./pages/ServiceDetail";
+import ServiceMeeting from "./pages/ServiceMeeting";
 import PostService from "./pages/PostService";
 import MyTransactions from "./pages/MyTransactions";
 import CreditDashboard from "./pages/CreditDashboard";
@@ -27,6 +28,12 @@ function InstallBanner() {
   const [dismissed, setDismissed] = useState(
     () => sessionStorage.getItem('pwa-dismissed') === 'true'
   );
+
+  useEffect(() => {
+    const visible = Boolean(installPrompt) && !dismissed;
+    document.body.classList.toggle('pwa-install-banner-visible', visible);
+    return () => document.body.classList.remove('pwa-install-banner-visible');
+  }, [installPrompt, dismissed]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -51,7 +58,7 @@ function InstallBanner() {
   };
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-md">
+    <div className="fixed bottom-4 left-4 right-4 z-[60] md:left-auto md:right-4 md:max-w-md">
       <div className="glass-card border border-indigo-100/70 bg-white/90 p-4 shadow-soft">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-sky-500 text-2xl text-white shadow-lg shadow-indigo-500/25">
@@ -144,6 +151,7 @@ function AnimatedAppRoutes() {
         <Route path="/register" element={user ? <Navigate to="/" /> : <PageTransition><Register /></PageTransition>} />
         <Route path="/services" element={<PageTransition><BrowseServices /></PageTransition>} />
         <Route path="/services/:id" element={<PageTransition><ServiceDetail /></PageTransition>} />
+        <Route path="/services/:id/meeting" element={<ProtectedRoute><PageTransition><ServiceMeeting /></PageTransition></ProtectedRoute>} />
         <Route path="/search" element={<PageTransition><SearchPage /></PageTransition>} />
         <Route path="/map" element={<PageTransition><MapView /></PageTransition>} />
 

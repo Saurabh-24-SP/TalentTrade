@@ -4,8 +4,10 @@ const { protect } = require('../middleware/authMiddleware');
 const {
     uploadProfile,
     uploadServiceImages,
+    uploadServiceContent,
     uploadChatImage,
     deleteImage,
+    deleteFile,
 } = require('../services/uploadService');
 const User = require('../models/User');
 const Service = require('../models/Service');
@@ -17,6 +19,13 @@ const getFileUrl = (file) => {
 
 const getPublicId = (file) => {
     return file.public_id || file.publicId || file.filename || '';
+};
+
+const getAttachmentKind = (file) => {
+    const mime = file.mimetype || '';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime === 'application/pdf') return 'pdf';
+    return 'file';
 };
 
 // POST /api/upload/avatar
@@ -95,6 +104,72 @@ router.post('/service/:serviceId', protect, (req, res) => {
             res.status(500).json({ success: false, message: error.message });
         }
     });
+});
+
+// POST /api/upload/service/:serviceId/content
+router.post('/service/:serviceId/content', protect, (req, res) => {
+    uploadServiceContent(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ success: false, message: 'No file was uploaded' });
+        }
+        try {
+            const service = await Service.findById(req.params.serviceId);
+            if (!service) {
+                return res.status(404).json({ success: false, message: 'Service not found' });
+            }
+            if (service.provider.toString() !== req.user._id.toString()) {
+                return res.status(403).json({ success: false, message: 'You are not authorized' });
+            }
+
+            const newAttachments = req.files.map((file) => ({
+                kind: getAttachmentKind(file),
+                url: getFileUrl(file),
+                publicId: getPublicId(file),
+                originalName: file.originalname || '',
+                mimeType: file.mimetype || '',
+                sizeBytes: file.bytes || file.size || 0,
+            }));
+
+            service.attachments = [...(service.attachments || []), ...newAttachments].slice(0, 15);
+            await service.save();
+
+            res.json({
+                success: true,
+                attachments: service.attachments,
+                message: `${req.files.length} file(s) uploaded ✅`,
+            });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+});
+
+// DELETE /api/upload/service/:serviceId/content
+router.delete('/service/:serviceId/content', protect, async (req, res) => {
+    try {
+        const { publicId } = req.body;
+        const service = await Service.findById(req.params.serviceId);
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
+        if (service.provider.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'You are not authorized' });
+        }
+        if (!publicId) {
+            return res.status(400).json({ success: false, message: 'publicId is required' });
+        }
+
+        await deleteFile(publicId);
+        service.attachments = (service.attachments || []).filter((item) => item.publicId !== publicId);
+        await service.save();
+
+        res.json({ success: true, attachments: service.attachments, message: 'File deleted ✅' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 // DELETE /api/upload/service/:serviceId/image

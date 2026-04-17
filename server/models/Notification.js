@@ -12,6 +12,7 @@ const notificationSchema = new mongoose.Schema(
                 'booking_declined',
                 'booking_completed',
                 'new_message',
+                'meeting_invite',
                 'credit_earned',
                 'credit_deducted',
                 'new_review',

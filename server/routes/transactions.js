@@ -8,6 +8,39 @@ const Request = require("../models/Request");
 const { protect } = require("../middleware/authMiddleware");
 const { sendEmail } = require("../services/emailService");
 
+const normalizeMeetingPayload = (body = {}) => {
+    const meetingUrl = typeof body.meetingUrl === "string" ? body.meetingUrl.trim() : "";
+    const scheduledAtRaw = body.scheduledAt;
+
+    if (meetingUrl) {
+        try {
+            // Accept Meet/Jitsi/Zoom/etc. Any valid URL is fine.
+            // (We validate format only; we don't enforce host.)
+            // eslint-disable-next-line no-new
+            new URL(meetingUrl);
+        } catch {
+            return { error: "Invalid meetingUrl. Please provide a valid URL (https://...)." };
+        }
+    }
+
+    let scheduledAt = null;
+    if (scheduledAtRaw) {
+        const parsed = new Date(scheduledAtRaw);
+        if (Number.isNaN(parsed.getTime())) {
+            return { error: "Invalid scheduledAt. Please provide a valid date/time." };
+        }
+        scheduledAt = parsed;
+    }
+
+    return { meetingUrl, scheduledAt };
+};
+
+const buildDefaultMeetingUrl = (transactionId) => {
+    const base = process.env.JITSI_BASE_URL || "https://meet.jit.si";
+    const roomName = `talenttrade-${transactionId}`;
+    return `${base.replace(/\/$/, "")}/${encodeURIComponent(roomName)}`;
+};
+
 // ✅ REQUEST SERVICE
 // POST /api/transactions/create
 router.post("/create", protect, async (req, res) => {
@@ -62,7 +95,7 @@ router.post("/create", protect, async (req, res) => {
             credits: service.hoursRequired,
             bookingId: transaction._id,
         }).catch(err => console.error('Booking request email failed:', err.message));
-          
+
         // Notification to provider
         createNotification({
             recipientId: service.provider,
@@ -125,9 +158,20 @@ router.put("/accept/:id", protect, async (req, res) => {
         transaction.creditsLocked = true;
         await transaction.save();
 
-        await Request.findOneAndUpdate(
+        const meetingPayload = normalizeMeetingPayload(req.body);
+        if (meetingPayload.error) {
+            return res.status(400).json({ message: meetingPayload.error });
+        }
+
+        const meetingUrlToSave = meetingPayload.meetingUrl || buildDefaultMeetingUrl(transaction._id);
+
+        const updatedRequest = await Request.findOneAndUpdate(
             { transaction: transaction._id },
-            { status: "accepted" },
+            {
+                status: "accepted",
+                meetingUrl: meetingUrlToSave,
+                ...(meetingPayload.scheduledAt !== null ? { scheduledAt: meetingPayload.scheduledAt } : {}),
+            },
             { new: true }
         );
 
@@ -148,7 +192,7 @@ router.put("/accept/:id", protect, async (req, res) => {
             reason: `Booking accepted for "${service.title}" — ${transaction.hoursSpent} credits reserved`,
             newBalance: updatedRequester.timeCredits,
         }).catch(err => console.error('Credit deduct email failed:', err.message));
-  
+
         // Notification to requester
         createNotification({
             recipientId: transaction.requester,
@@ -178,11 +222,50 @@ router.put("/accept/:id", protect, async (req, res) => {
         return res.json({
             message: "Transaction accepted! ✅",
             transaction,
+            request: updatedRequest,
             requesterCredits: updatedRequester.timeCredits,
         });
 
     } catch (error) {
         console.error("Accept Error:", error.message);
+        return res.status(500).json({ message: error.message });
+    }
+});
+
+// ✅ UPDATE MEETING DETAILS (provider only)
+// PUT /api/transactions/meeting/:id
+router.put("/meeting/:id", protect, async (req, res) => {
+    try {
+        const transaction = await Transaction.findById(req.params.id);
+
+        if (!transaction) {
+            return res.status(404).json({ message: "Transaction not found" });
+        }
+
+        if (transaction.provider.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: "Only the provider can update meeting details" });
+        }
+
+        if (transaction.status !== "accepted") {
+            return res.status(400).json({ message: "Meeting details can be updated only for accepted transactions" });
+        }
+
+        const meetingPayload = normalizeMeetingPayload(req.body);
+        if (meetingPayload.error) {
+            return res.status(400).json({ message: meetingPayload.error });
+        }
+
+        const updatedRequest = await Request.findOneAndUpdate(
+            { transaction: transaction._id },
+            {
+                ...(typeof meetingPayload.meetingUrl === "string" ? { meetingUrl: meetingPayload.meetingUrl } : {}),
+                ...(meetingPayload.scheduledAt !== null ? { scheduledAt: meetingPayload.scheduledAt } : {}),
+            },
+            { new: true }
+        );
+
+        return res.json({ success: true, request: updatedRequest });
+    } catch (error) {
         return res.status(500).json({ message: error.message });
     }
 });
@@ -374,7 +457,19 @@ router.get("/my", protect, async (req, res) => {
             .populate("provider", "name")
             .sort({ createdAt: -1 });
 
-        return res.json(transactions);
+        const txIds = transactions.map((tx) => tx._id);
+        const requests = await Request.find({ transaction: { $in: txIds } })
+            .select("transaction status scheduledAt meetingUrl")
+            .lean();
+
+        const requestByTx = new Map(requests.map((r) => [String(r.transaction), r]));
+        const payload = transactions.map((tx) => {
+            const obj = tx.toObject();
+            obj.request = requestByTx.get(String(tx._id)) || null;
+            return obj;
+        });
+
+        return res.json(payload);
 
     } catch (error) {
         return res.status(500).json({ message: error.message });

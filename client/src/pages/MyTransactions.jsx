@@ -17,6 +17,7 @@ export default function MyTransactions() {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("all");
+    const [meetingDrafts, setMeetingDrafts] = useState({});
 
     useEffect(() => {
         API.get("/transactions/my")
@@ -25,13 +26,79 @@ export default function MyTransactions() {
             .finally(() => setLoading(false));
     }, []);
 
+    const getDraft = (tx) => {
+        const existing = meetingDrafts[tx._id];
+        if (existing) return existing;
+        return {
+            meetingUrl: tx.request?.meetingUrl || "",
+            scheduledAt: tx.request?.scheduledAt ? new Date(tx.request.scheduledAt).toISOString().slice(0, 16) : "",
+        };
+    };
+
+    const updateDraft = (txId, patch) => {
+        setMeetingDrafts((prev) => ({
+            ...prev,
+            [txId]: { ...(prev[txId] || {}), ...patch },
+        }));
+    };
+
     const handleAccept = async (id) => {
         try {
-            await API.put(`/transactions/accept/${id}`);
-            setTransactions((prev) => prev.map((transaction) => (transaction._id === id ? { ...transaction, status: "accepted" } : transaction)));
+            const tx = transactions.find((t) => t._id === id);
+            const draft = tx ? getDraft(tx) : { meetingUrl: "", scheduledAt: "" };
+            const payload = {
+                meetingUrl: draft.meetingUrl || "",
+                scheduledAt: draft.scheduledAt || null,
+            };
+            const res = await API.put(`/transactions/accept/${id}`, payload);
+            const updatedRequest = res.data?.request;
+
+            setTransactions((prev) =>
+                prev.map((transaction) => {
+                    if (transaction._id !== id) return transaction;
+                    return {
+                        ...transaction,
+                        status: "accepted",
+                        request: {
+                            ...(transaction.request || {}),
+                            ...(updatedRequest || {}),
+                            status: "accepted",
+                        },
+                    };
+                })
+            );
             await refreshUser();
         } catch (err) {
             alert(err.response?.data?.message || "Failed to accept");
+        }
+    };
+
+    const handleSaveMeeting = async (id) => {
+        try {
+            const tx = transactions.find((t) => t._id === id);
+            const draft = tx ? getDraft(tx) : { meetingUrl: "", scheduledAt: "" };
+            const payload = {
+                meetingUrl: draft.meetingUrl || "",
+                scheduledAt: draft.scheduledAt || null,
+            };
+            const res = await API.put(`/transactions/meeting/${id}`, payload);
+            const updatedRequest = res.data?.request;
+
+            setTransactions((prev) =>
+                prev.map((transaction) => {
+                    if (transaction._id !== id) return transaction;
+                    return {
+                        ...transaction,
+                        request: updatedRequest || {
+                            ...(transaction.request || {}),
+                            meetingUrl: payload.meetingUrl,
+                            scheduledAt: payload.scheduledAt,
+                        },
+                    };
+                })
+            );
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to save meeting");
         }
     };
 
@@ -93,6 +160,8 @@ export default function MyTransactions() {
                         {filtered.map((transaction) => {
                             const isProvider = transaction.provider?._id === user?._id;
                             const isRequester = transaction.requester?._id === user?._id;
+                            const draft = getDraft(transaction);
+                            const joinUrl = transaction.request?.meetingUrl || "";
 
                             return (
                                 <GlassCard key={transaction._id} className="p-5">
@@ -123,6 +192,30 @@ export default function MyTransactions() {
                                         })}
                                     </p>
 
+                                    {(isProvider && (transaction.status === "pending" || transaction.status === "accepted")) && (
+                                        <div className="mb-4 grid gap-3 md:grid-cols-2">
+                                            <div>
+                                                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Meeting link (optional)</p>
+                                                <input
+                                                    type="url"
+                                                    placeholder="https://meet.google.com/... or https://..."
+                                                    value={draft.meetingUrl}
+                                                    onChange={(e) => updateDraft(transaction._id, { meetingUrl: e.target.value })}
+                                                    className="premium-input"
+                                                />
+                                            </div>
+                                            <div>
+                                                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Schedule (optional)</p>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={draft.scheduledAt}
+                                                    onChange={(e) => updateDraft(transaction._id, { scheduledAt: e.target.value })}
+                                                    className="premium-input"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex flex-wrap gap-2">
                                         {isProvider && transaction.status === "pending" && (
                                             <button onClick={() => handleAccept(transaction._id)} className="premium-button px-4 py-2 text-sm">
@@ -130,9 +223,24 @@ export default function MyTransactions() {
                                             </button>
                                         )}
                                         {isProvider && transaction.status === "accepted" && (
+                                            <button onClick={() => handleSaveMeeting(transaction._id)} className="premium-button premium-button-ghost px-4 py-2 text-sm">
+                                                Save meeting
+                                            </button>
+                                        )}
+                                        {isProvider && transaction.status === "accepted" && (
                                             <button onClick={() => handleComplete(transaction._id)} className="premium-button px-4 py-2 text-sm">
                                                 Mark complete ✅
                                             </button>
+                                        )}
+                                        {(isRequester || isProvider) && transaction.status === "accepted" && joinUrl && (
+                                            <a
+                                                href={joinUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="premium-button premium-button-ghost px-4 py-2 text-sm"
+                                            >
+                                                Join meeting
+                                            </a>
                                         )}
                                         {(isProvider || isRequester) && transaction.status === "pending" && (
                                             <button onClick={() => handleCancel(transaction._id)} className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100">

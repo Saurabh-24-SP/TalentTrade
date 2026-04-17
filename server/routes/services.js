@@ -30,6 +30,12 @@ const buildAvailability = (availability = {}) => ({
     note: availability.note || "",
 });
 
+const buildLiveMeeting = (liveMeeting = {}) => ({
+    available: Boolean(liveMeeting.available),
+    platform: typeof liveMeeting.platform === "string" ? liveMeeting.platform.trim() : "",
+    note: typeof liveMeeting.note === "string" ? liveMeeting.note.trim() : "",
+});
+
 // ✅ GET ALL SERVICES
 // GET /api/services/all
 router.get("/all", async (req, res) => {
@@ -189,6 +195,40 @@ router.post("/:id/request", protect, async (req, res) => {
     }
 });
 
+// POST /api/services/:id/meeting-invite
+// Creates a real-time notification for the service provider with a Join Meeting link.
+router.post("/:id/meeting-invite", protect, async (req, res) => {
+    try {
+        const service = await Service.findById(req.params.id).populate("provider", "name");
+        if (!service) {
+            return res.status(404).json({ message: "Service not found" });
+        }
+
+        if (String(service.provider?._id) === String(req.user._id)) {
+            return res.status(400).json({ message: "You cannot invite yourself" });
+        }
+
+        const requester = await User.findById(req.user._id).select("name");
+
+        await createNotification({
+            recipientId: service.provider._id,
+            senderId: req.user._id,
+            type: "meeting_invite",
+            title: "Video Meeting Invite 📹",
+            body: `${requester?.name || "Someone"} started a meeting for "${service.title}". Tap to join.`,
+            actionUrl: `/services/${service._id}/meeting`,
+            data: {
+                serviceId: String(service._id),
+                roomId: `service_${service._id}`,
+            },
+        });
+
+        return res.json({ success: true });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+});
+
 // POST /api/services/:id/save
 router.post("/:id/save", protect, async (req, res) => {
     try {
@@ -217,7 +257,7 @@ router.post("/:id/save", protect, async (req, res) => {
 // POST /api/services/create
 router.post("/create", protect, async (req, res) => {
     try {
-        const { title, description, category, hoursRequired, tags, location, image, images, availability } = req.body;
+        const { title, description, category, hoursRequired, tags, location, image, images, availability, videoUrl, liveMeeting } = req.body;
 
         if (!title || !description || !category || !hoursRequired) {
             return res.status(400).json({ message: "Title, description, category, hoursRequired required" });
@@ -234,6 +274,8 @@ router.post("/create", protect, async (req, res) => {
             image: image || "",
             images: Array.isArray(images) ? images : [],
             availability: buildAvailability(availability),
+            videoUrl: typeof videoUrl === "string" ? videoUrl.trim() : "",
+            liveMeeting: buildLiveMeeting(liveMeeting),
         });
 
         return res.status(201).json(service);

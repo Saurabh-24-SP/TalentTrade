@@ -32,6 +32,17 @@ const chatStorage = new cloudinaryStorage({
     allowedFormats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
 });
 
+// Service resources storage (pdf/video)
+const serviceContentStorage = new cloudinaryStorage({
+    cloudinary: cloudinary,
+    allowedFormats: ['pdf', 'mp4', 'mov', 'webm', 'mkv', 'jpg', 'jpeg', 'png', 'webp'],
+    params: {
+        folder: 'TalentTrade-AI/service-content',
+        resource_type: 'auto',
+        allowed_formats: ['pdf', 'mp4', 'mov', 'webm', 'mkv', 'jpg', 'jpeg', 'png', 'webp'],
+    },
+});
+
 // Multer upload handlers
 const uploadProfile = multer({
     storage: profileStorage,
@@ -60,6 +71,16 @@ const uploadChatImage = multer({
     },
 }).single('image');
 
+const uploadServiceContent = multer({
+    storage: serviceContentStorage,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    fileFilter: (req, file, cb) => {
+        const allowed = file.mimetype.startsWith('video/') || file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/');
+        if (allowed) cb(null, true);
+        else cb(new Error('Only video, PDF, or image files are allowed'), false);
+    },
+}).array('files', 10);
+
 // Delete image from Cloudinary
 const deleteImage = async (publicId) => {
     try {
@@ -71,10 +92,30 @@ const deleteImage = async (publicId) => {
     }
 };
 
+const deleteFile = async (publicId) => {
+    const resourceTypes = ['image', 'video', 'raw'];
+    let lastResult = null;
+    for (const resource_type of resourceTypes) {
+        try {
+            const result = await cloudinary.uploader.destroy(publicId, { resource_type });
+            lastResult = result;
+            if (result?.result && result.result !== 'not found') {
+                return result;
+            }
+        } catch (error) {
+            // keep trying other resource types
+            lastResult = lastResult || { result: 'error', error: error.message };
+        }
+    }
+    return lastResult;
+};
+
 module.exports = {
     uploadProfile,
     uploadServiceImages,
     uploadChatImage,
     deleteImage,
+    uploadServiceContent,
+    deleteFile,
     cloudinary,
 };

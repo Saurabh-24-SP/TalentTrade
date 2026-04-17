@@ -3,10 +3,8 @@ import { useLocation } from "react-router-dom";
 import API from "../utils/api";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
-import { io } from "socket.io-client";
+import { ensureSocketConnected, disconnectSocket } from "../utils/socket";
 import { GlassCard, PageShell, Reveal, SectionHeading } from "../components/PremiumMotion";
-
-const socket = io("http://localhost:5000");
 
 export default function Chat() {
     const { user } = useAuth();
@@ -16,20 +14,44 @@ export default function Chat() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const bottomRef = useRef(null);
+    const socketRef = useRef(null);
+    const selectedRef = useRef(null);
 
     useEffect(() => {
-        if (user) {
-            socket.emit("user_online", user._id);
-            API.get("/admin/users")
-                .then((res) => setUsers(res.data.filter((candidate) => candidate._id !== user._id)))
-                .catch((err) => console.error(err));
+        selectedRef.current = selected;
+    }, [selected]);
+
+    useEffect(() => {
+        if (!user?._id) {
+            disconnectSocket();
+            return;
         }
 
-        socket.on("receive_message", (data) => {
-            setMessages((prev) => [...prev, data]);
-        });
+        const socket = ensureSocketConnected(user._id);
+        socketRef.current = socket;
 
-        return () => socket.off("receive_message");
+        API.get("/messages/contacts")
+            .then((res) => setUsers(res.data))
+            .catch((err) => console.error(err));
+
+        const onReceive = (data) => {
+            const currentSelected = selectedRef.current;
+            if (!currentSelected?._id) return;
+
+            const senderId = String(data?.senderId || data?.sender?._id || data?.sender || "");
+            const receiverId = String(data?.receiverId || data?.receiver?._id || data?.receiver || "");
+            const selectedId = String(currentSelected._id);
+
+            // Only append in the currently open conversation.
+            if (senderId === selectedId || receiverId === selectedId) {
+                setMessages((prev) => [...prev, data]);
+            }
+        };
+
+        socket.on("receive_message", onReceive);
+        return () => {
+            socket.off("receive_message", onReceive);
+        };
     }, [user]);
 
     useEffect(() => {
@@ -48,22 +70,38 @@ export default function Chat() {
 
     const selectUser = async (candidate) => {
         setSelected(candidate);
-        const res = await API.get(`/messages/${candidate._id}`);
-        setMessages(res.data);
+        try {
+            const res = await API.get(`/messages/${candidate._id}`);
+            setMessages(res.data);
+        } catch (err) {
+            console.error(err);
+            setMessages([]);
+        }
     };
 
     const sendMessage = async () => {
         if (!input.trim() || !selected) return;
-        const msg = {
-            senderId: user._id,
-            receiverId: selected._id,
-            text: input,
-            createdAt: new Date(),
-        };
-        socket.emit("send_message", msg);
-        await API.post("/messages/send", { receiverId: selected._id, text: input });
-        setMessages((prev) => [...prev, { ...msg, sender: { _id: user._id } }]);
+
+        const text = input;
         setInput("");
+        try {
+            const { data: saved } = await API.post("/messages/send", { receiverId: selected._id, text });
+
+            const msg = {
+                _id: saved?._id,
+                senderId: user._id,
+                receiverId: selected._id,
+                text: saved?.text || text,
+                createdAt: saved?.createdAt || new Date().toISOString(),
+            };
+
+            socketRef.current?.emit("send_message", msg);
+            setMessages((prev) => [...prev, { ...msg, sender: user._id, receiver: selected._id }]);
+        } catch (err) {
+            console.error(err);
+            // restore input on failure
+            setInput(text);
+        }
     };
 
     return (
@@ -120,7 +158,8 @@ export default function Chat() {
 
                                     <div className="flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-white/30 to-slate-50/50 p-5">
                                         {messages.map((message, index) => {
-                                            const isMine = (message.sender?._id || message.senderId) === user._id;
+                                            const senderId = String(message.sender?._id || message.senderId || message.sender || "");
+                                            const isMine = senderId === String(user._id);
                                             return (
                                                 <div key={index} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                                                     <div className={`max-w-[75%] rounded-3xl px-4 py-3 text-sm leading-relaxed shadow-sm ${isMine ? "bg-gradient-to-r from-indigo-600 to-sky-500 text-white" : "bg-white text-slate-700"}`}>

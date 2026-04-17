@@ -28,11 +28,25 @@ const serviceSchema = new mongoose.Schema(
             hours: [{ type: String }],
             note: { type: String, default: "" },
         },
+        videoUrl: { type: String, default: "", trim: true },
+        liveMeeting: {
+            available: { type: Boolean, default: false },
+            platform: { type: String, default: "", trim: true },
+            note: { type: String, default: "", trim: true },
+        },
         status: { type: String, enum: ["active", "inactive"], default: "active" },
         totalBookings: { type: Number, default: 0 },
         images: [{
             url: { type: String },
             publicId: { type: String },
+        }],
+        attachments: [{
+            kind: { type: String, enum: ["video", "pdf", "file"], default: "file" },
+            url: { type: String, default: "" },
+            publicId: { type: String, default: "" },
+            originalName: { type: String, default: "" },
+            mimeType: { type: String, default: "" },
+            sizeBytes: { type: Number, default: 0 },
         }],
     },
     { timestamps: true }

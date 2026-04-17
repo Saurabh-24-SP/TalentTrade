@@ -5,6 +5,25 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import { GlassCard, PageShell, Reveal, SectionHeading, Stagger, StaggerItem } from "../components/PremiumMotion";
 
+const getYouTubeEmbedUrl = (rawUrl = "") => {
+    if (!rawUrl) return "";
+    try {
+        const url = new URL(rawUrl);
+        const host = url.hostname.replace(/^www\./, "");
+        if (host === "youtu.be") {
+            const id = url.pathname.replace("/", "").trim();
+            return id ? `https://www.youtube.com/embed/${id}` : "";
+        }
+        if (host === "youtube.com" || host === "m.youtube.com") {
+            const id = url.searchParams.get("v");
+            return id ? `https://www.youtube.com/embed/${id}` : "";
+        }
+        return "";
+    } catch {
+        return "";
+    }
+};
+
 function StarRating({ value = 0 }) {
     return (
         <div className="flex items-center gap-1 text-amber-400">
@@ -84,6 +103,13 @@ function SectionLabel({ title, value }) {
     );
 }
 
+function getReadableFileLabel(attachment) {
+    if (!attachment) return "File";
+    if (attachment.kind === "pdf") return "PDF";
+    if (attachment.kind === "video") return "Video";
+    return "File";
+}
+
 export default function ServiceDetail() {
     const { id } = useParams();
     const { user } = useAuth();
@@ -97,6 +123,13 @@ export default function ServiceDetail() {
     const [success, setSuccess] = useState("");
     const [error, setError] = useState("");
     const [selectedImage, setSelectedImage] = useState("");
+    const [videoUrlDraft, setVideoUrlDraft] = useState("");
+    const [imageFiles, setImageFiles] = useState([]);
+    const [resourceFiles, setResourceFiles] = useState([]);
+    const [contentBusy, setContentBusy] = useState(false);
+    const [contentError, setContentError] = useState("");
+
+    const embedUrl = useMemo(() => getYouTubeEmbedUrl(service?.videoUrl || ""), [service?.videoUrl]);
 
     useEffect(() => {
         setLoading(true);
@@ -105,10 +138,17 @@ export default function ServiceDetail() {
                 setService(res.data);
                 const firstImage = res.data.images?.[0]?.url || res.data.image || "";
                 setSelectedImage(firstImage);
+                setVideoUrlDraft(res.data.videoUrl || "");
             })
             .catch((err) => console.error(err))
             .finally(() => setLoading(false));
     }, [id]);
+
+    useEffect(() => {
+        if (service?.videoUrl !== undefined) {
+            setVideoUrlDraft(service.videoUrl || "");
+        }
+    }, [service?.videoUrl]);
 
     useEffect(() => {
         API.get(`/services/${id}/reviews`)
@@ -165,6 +205,21 @@ export default function ServiceDetail() {
         }
     };
 
+    const handleVideoMeeting = async () => {
+        if (!user) return navigate("/login");
+
+        // If viewer is not the provider, notify provider with a Join Meeting option.
+        if (!isOwner) {
+            try {
+                await API.post(`/services/${id}/meeting-invite`);
+            } catch {
+                // Non-blocking: meeting can still be joined even if invite fails.
+            }
+        }
+
+        navigate(`/services/${id}/meeting`);
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-50">
@@ -191,6 +246,101 @@ export default function ServiceDetail() {
     const similarServices = service.similarServices || [];
     const mainImage = selectedImage || gallery[0]?.url || service.image || "";
 
+    const syncSelectedImage = (nextImages) => {
+        const nextGallery = (nextImages || []).filter((img) => img?.url);
+        if (selectedImage && nextGallery.some((img) => img.url === selectedImage)) return;
+        setSelectedImage(nextGallery[0]?.url || service.image || "");
+    };
+
+    const saveVideoLink = async (nextValue) => {
+        if (!isOwner) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const payloadUrl = typeof nextValue === "string" ? nextValue : videoUrlDraft;
+            const res = await API.put(`/services/update/${id}`, { videoUrl: payloadUrl });
+            const savedUrl = res.data?.videoUrl ?? payloadUrl;
+            setService((prev) => (prev ? { ...prev, videoUrl: savedUrl } : prev));
+            setVideoUrlDraft(savedUrl);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Failed to update video link");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const uploadImages = async () => {
+        if (!isOwner || !imageFiles.length) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const fd = new FormData();
+            imageFiles.forEach((file) => fd.append("images", file));
+            const res = await API.post(`/upload/service/${id}`, fd, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            const nextImages = res.data?.images || [];
+            setService((prev) => (prev ? { ...prev, images: nextImages } : prev));
+            syncSelectedImage(nextImages);
+            setImageFiles([]);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Image upload failed");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const uploadResources = async () => {
+        if (!isOwner || !resourceFiles.length) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const fd = new FormData();
+            resourceFiles.forEach((file) => fd.append("files", file));
+            const res = await API.post(`/upload/service/${id}/content`, fd, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            const nextAttachments = res.data?.attachments || [];
+            setService((prev) => (prev ? { ...prev, attachments: nextAttachments } : prev));
+            setResourceFiles([]);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "File upload failed");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const deleteImage = async (publicId) => {
+        if (!isOwner || !publicId) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const res = await API.delete(`/upload/service/${id}/image`, { data: { publicId } });
+            const nextImages = res.data?.images || [];
+            setService((prev) => (prev ? { ...prev, images: nextImages } : prev));
+            syncSelectedImage(nextImages);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Delete failed");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const deleteAttachment = async (publicId) => {
+        if (!isOwner || !publicId) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const res = await API.delete(`/upload/service/${id}/content`, { data: { publicId } });
+            const nextAttachments = res.data?.attachments || [];
+            setService((prev) => (prev ? { ...prev, attachments: nextAttachments } : prev));
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Delete failed");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
     return (
         <PageShell>
             <Navbar />
@@ -201,6 +351,9 @@ export default function ServiceDetail() {
                         <span className="premium-pill capitalize">{service.category}</span>
                         <span className="premium-pill">{service.providerStats?.reviewCount || reviews.length} reviews</span>
                         <span className="premium-pill">{completedJobs} completed jobs</span>
+                        {service.liveMeeting?.available && (
+                            <span className="premium-pill">Live meeting available</span>
+                        )}
                     </div>
                 </Reveal>
 
@@ -263,6 +416,239 @@ export default function ServiceDetail() {
                                 )}
                             </GlassCard>
                         </Reveal>
+
+                        {isOwner && (
+                            <Reveal delay={0.065}>
+                                <GlassCard className="overflow-hidden p-0">
+                                    <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 px-6 py-5">
+                                        <SectionHeading
+                                            eyebrow="Provider"
+                                            title="Manage content"
+                                            description="Only you can add or delete content. Other users can only view."
+                                        />
+                                    </div>
+
+                                    <div className="p-6 md:p-8">
+                                        {contentError && (
+                                            <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                                {contentError}
+                                            </div>
+                                        )}
+
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-5">
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Video link</p>
+                                                <input
+                                                    type="url"
+                                                    placeholder="https://youtube.com/watch?v=... (optional)"
+                                                    value={videoUrlDraft}
+                                                    disabled={contentBusy}
+                                                    onChange={(e) => setVideoUrlDraft(e.target.value)}
+                                                    className="premium-input mt-3"
+                                                />
+                                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => saveVideoLink()}
+                                                        disabled={contentBusy}
+                                                        className="premium-button px-5 py-2.5 text-xs"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => saveVideoLink("")}
+                                                        disabled={contentBusy}
+                                                        className="premium-button premium-button-ghost px-5 py-2.5 text-xs"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-5">
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upload</p>
+                                                <div className="mt-3 space-y-4">
+                                                    <div>
+                                                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Images (max 5)</p>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            multiple
+                                                            disabled={contentBusy || gallery.length >= 5}
+                                                            onChange={(e) => {
+                                                                const remaining = Math.max(0, 5 - gallery.length);
+                                                                setImageFiles(Array.from(e.target.files || []).slice(0, remaining));
+                                                            }}
+                                                            className="premium-input mt-2"
+                                                        />
+                                                        <div className="mt-2 flex items-center justify-between gap-3">
+                                                            <p className="text-xs text-slate-500">Selected: <span className="font-semibold">{imageFiles.length}</span></p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={uploadImages}
+                                                                disabled={contentBusy || !imageFiles.length}
+                                                                className="premium-button px-4 py-2 text-xs"
+                                                            >
+                                                                Upload
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">PDF / Video</p>
+                                                        <input
+                                                            type="file"
+                                                            accept="application/pdf,video/*"
+                                                            multiple
+                                                            disabled={contentBusy}
+                                                            onChange={(e) => setResourceFiles(Array.from(e.target.files || []).slice(0, 10))}
+                                                            className="premium-input mt-2"
+                                                        />
+                                                        <div className="mt-2 flex items-center justify-between gap-3">
+                                                            <p className="text-xs text-slate-500">Selected: <span className="font-semibold">{resourceFiles.length}</span></p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={uploadResources}
+                                                                disabled={contentBusy || !resourceFiles.length}
+                                                                className="premium-button px-4 py-2 text-xs"
+                                                            >
+                                                                Upload
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {Array.isArray(service.images) && service.images.length > 0 && (
+                                            <div className="mt-6">
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current images</p>
+                                                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                                    {service.images.filter((img) => img?.url).map((img) => (
+                                                        <div key={img.publicId || img.url} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                                                            <img src={img.url} alt="Service" className="h-24 w-full object-cover" />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => deleteImage(img.publicId)}
+                                                                disabled={contentBusy}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {Array.isArray(service.attachments) && service.attachments.length > 0 && (
+                                            <div className="mt-6">
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current files</p>
+                                                <div className="mt-3 space-y-2">
+                                                    {service.attachments.map((item) => (
+                                                        <div key={item.publicId || item.url} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                                                            <a
+                                                                href={item.url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700 hover:text-indigo-700"
+                                                            >
+                                                                {item.originalName || item.url}
+                                                            </a>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => deleteAttachment(item.publicId)}
+                                                                disabled={contentBusy}
+                                                                className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-60"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </GlassCard>
+                            </Reveal>
+                        )}
+
+                        {service.videoUrl && (
+                            <Reveal delay={0.075}>
+                                <GlassCard className="p-6 md:p-8">
+                                    <SectionHeading
+                                        eyebrow="Video"
+                                        title="Service video"
+                                        description="A quick preview or walkthrough from the provider."
+                                    />
+                                    <div className="mt-6">
+                                        {embedUrl ? (
+                                            <div className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+                                                <div className="aspect-video">
+                                                    <iframe
+                                                        title="Service video"
+                                                        src={embedUrl}
+                                                        className="h-full w-full"
+                                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                        allowFullScreen
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <a
+                                                href={service.videoUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="premium-button premium-button-ghost inline-flex items-center justify-center px-5 py-3 text-sm"
+                                            >
+                                                Open video link
+                                            </a>
+                                        )}
+                                    </div>
+                                </GlassCard>
+                            </Reveal>
+                        )}
+
+                        {service.attachments?.length > 0 && (
+                            <Reveal delay={0.09}>
+                                <GlassCard className="p-6 md:p-8">
+                                    <SectionHeading
+                                        eyebrow="Resources"
+                                        title="Uploaded content"
+                                        description="PDFs and recorded videos shared by the provider."
+                                    />
+                                    <div className="mt-6 space-y-3">
+                                        {service.attachments.map((item) => (
+                                            <div key={item.publicId || item.url} className="rounded-3xl border border-slate-200/70 bg-white/85 p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{getReadableFileLabel(item)}</p>
+                                                        <p className="mt-1 truncate text-sm font-semibold text-slate-900">{item.originalName || item.url}</p>
+                                                    </div>
+                                                    <a
+                                                        href={item.url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="premium-button premium-button-ghost inline-flex items-center justify-center px-4 py-2 text-xs"
+                                                    >
+                                                        Open
+                                                    </a>
+                                                </div>
+
+                                                {item.kind === "video" && (
+                                                    <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200/70 bg-white">
+                                                        <div className="aspect-video">
+                                                            <video src={item.url} controls className="h-full w-full" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </GlassCard>
+                            </Reveal>
+                        )}
 
                         <Reveal delay={0.1}>
                             <GlassCard className="p-6 md:p-8">
@@ -423,6 +809,12 @@ export default function ServiceDetail() {
                                                 Chat with Provider
                                             </button>
                                             <button
+                                                onClick={handleVideoMeeting}
+                                                className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"
+                                            >
+                                                Video Meeting
+                                            </button>
+                                            <button
                                                 onClick={handleSave}
                                                 disabled={saving || service.isSaved}
                                                 className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"
@@ -431,8 +823,16 @@ export default function ServiceDetail() {
                                             </button>
                                         </>
                                     ) : isOwner ? (
-                                        <div className="rounded-2xl bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">
-                                            This is your service listing.
+                                        <div className="space-y-3">
+                                            <div className="rounded-2xl bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">
+                                                This is your service listing.
+                                            </div>
+                                            <button
+                                                onClick={handleVideoMeeting}
+                                                className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"
+                                            >
+                                                Video Meeting
+                                            </button>
                                         </div>
                                     ) : (
                                         <>
@@ -441,6 +841,12 @@ export default function ServiceDetail() {
                                                 className="premium-button w-full justify-center px-5 py-3 text-sm"
                                             >
                                                 Login to Request
+                                            </button>
+                                            <button
+                                                onClick={() => navigate("/login")}
+                                                className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"
+                                            >
+                                                Login to Join Meeting
                                             </button>
                                             <button
                                                 onClick={() => navigate("/login")}

@@ -77,6 +77,10 @@
 }
 
 @layer components {
+  body.pwa-install-banner-visible .ai-chatbot-root {
+    bottom: 8.25rem;
+  }
+
   .premium-page {
     position: relative;
     min-height: 100vh;

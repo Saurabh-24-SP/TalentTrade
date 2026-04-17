@@ -1,13 +1,20 @@
-'EOF'
 # Dependencies
 node_modules/
 client/node_modules/
 server/node_modules/
 
-# Environment files
+# Environment files (keep examples in git)
 .env
+.env.*
+!.env.example
+
 client/.env
+client/.env.*
+!client/.env.example
+
 server/.env
+server/.env.*
+!server/.env.example
 
 # Build
 client/dist/
@@ -20,4 +27,3 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
-EOF

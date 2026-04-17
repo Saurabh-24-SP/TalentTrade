@@ -3,10 +3,11 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const path = require("path");
 const connectDB = require("./config/db");
 const { setSocketIO } = require('./services/notificationHelper');
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 connectDB();
 
 const app = express();
@@ -21,8 +22,10 @@ const allowedOrigins = [
             process.env.CLIENT_URL,
             "http://localhost:5173",
             "http://localhost:3000",
+            "http://localhost:3001",
             "http://127.0.0.1:5173",
             "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
             "https://talenttrade.saurabhtech.in",
         ].filter(Boolean).map((origin) => origin.trim())
     ),
@@ -59,31 +62,108 @@ app.use("/api/dashboard", require("./routes/dashboard"));
 app.get("/", (req, res) => res.send("TalentTradeServer Running ✅"));
 
 // Socket.io — Real-time Chat
-const onlineUsers = new Map();
+const userSockets = new Map(); // userId -> Set(socketId)
+const socketToUser = new Map(); // socketId -> userId
+
+const emitOnlineUsers = () => {
+    io.emit("online_users", Array.from(userSockets.keys()));
+};
+
+const registerUserSocket = (socket, userId) => {
+    if (!userId) return;
+    const id = String(userId);
+
+    const previousUserId = socketToUser.get(socket.id);
+    if (previousUserId && previousUserId !== id && userSockets.has(previousUserId)) {
+        const previousSet = userSockets.get(previousUserId);
+        previousSet.delete(socket.id);
+        if (previousSet.size === 0) userSockets.delete(previousUserId);
+    }
+
+    socket.join(`user_${id}`);
+    socketToUser.set(socket.id, id);
+
+    const existing = userSockets.get(id) || new Set();
+    existing.add(socket.id);
+    userSockets.set(id, existing);
+    emitOnlineUsers();
+};
 io.on("connection", (socket) => {
-    socket.on('join_user_room', (userId) => {
-        socket.join(`user_${userId}`);
-        console.log(`User ${userId} joined room`);
-    });
     console.log("User connected:", socket.id);
 
+    socket.on('join_user_room', (userId) => {
+        registerUserSocket(socket, userId);
+        console.log(`User ${userId} joined room`);
+    });
+
     socket.on("user_online", (userId) => {
-        onlineUsers.set(userId, socket.id);
-        io.emit("online_users", Array.from(onlineUsers.keys()));
+        registerUserSocket(socket, userId);
     });
 
     socket.on("send_message", (data) => {
-        const receiverSocket = onlineUsers.get(data.receiverId);
-        if (receiverSocket) {
-            io.to(receiverSocket).emit("receive_message", data);
-        }
+        if (!data?.receiverId) return;
+        io.to(`user_${data.receiverId}`).emit("receive_message", data);
+    });
+
+    // ─── WebRTC Meeting Signaling (per-service rooms) ─────────────────────────
+    socket.on("meeting:join", ({ roomId, userId } = {}) => {
+        if (!roomId) return;
+        const safeRoomId = String(roomId);
+        socket.join(safeRoomId);
+        socket.emit("meeting:joined", { roomId: safeRoomId, socketId: socket.id });
+        socket.to(safeRoomId).emit("meeting:peer-joined", {
+            roomId: safeRoomId,
+            socketId: socket.id,
+            userId: userId ? String(userId) : null,
+        });
+    });
+
+    socket.on("meeting:leave", ({ roomId } = {}) => {
+        if (!roomId) return;
+        const safeRoomId = String(roomId);
+        socket.leave(safeRoomId);
+        socket.to(safeRoomId).emit("meeting:peer-left", { roomId: safeRoomId, socketId: socket.id });
+    });
+
+    socket.on("meeting:offer", ({ to, from, sdp, roomId } = {}) => {
+        if (!to || !sdp) return;
+        io.to(String(to)).emit("meeting:offer", {
+            to: String(to),
+            from: from ? String(from) : socket.id,
+            sdp,
+            roomId: roomId ? String(roomId) : null,
+        });
+    });
+
+    socket.on("meeting:answer", ({ to, from, sdp, roomId } = {}) => {
+        if (!to || !sdp) return;
+        io.to(String(to)).emit("meeting:answer", {
+            to: String(to),
+            from: from ? String(from) : socket.id,
+            sdp,
+            roomId: roomId ? String(roomId) : null,
+        });
+    });
+
+    socket.on("meeting:ice-candidate", ({ to, from, candidate, roomId } = {}) => {
+        if (!to || !candidate) return;
+        io.to(String(to)).emit("meeting:ice-candidate", {
+            to: String(to),
+            from: from ? String(from) : socket.id,
+            candidate,
+            roomId: roomId ? String(roomId) : null,
+        });
     });
 
     socket.on("disconnect", () => {
-        onlineUsers.forEach((id, userId) => {
-            if (id === socket.id) onlineUsers.delete(userId);
-        });
-        io.emit("online_users", Array.from(onlineUsers.keys()));
+        const userId = socketToUser.get(socket.id);
+        socketToUser.delete(socket.id);
+        if (userId && userSockets.has(userId)) {
+            const set = userSockets.get(userId);
+            set.delete(socket.id);
+            if (set.size === 0) userSockets.delete(userId);
+        }
+        emitOnlineUsers();
     });
 });
 

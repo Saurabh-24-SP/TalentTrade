@@ -12,6 +12,7 @@ const NOTIF_CONFIG = {
     booking_declined: { icon: '❌', color: '#ef4444' },
     booking_completed: { icon: '🎉', color: '#8b5cf6' },
     new_message: { icon: '💬', color: '#3b82f6' },
+    meeting_invite: { icon: '📹', color: '#6366f1' },
     credit_earned: { icon: '💰', color: '#10b981' },
     credit_deducted: { icon: '💸', color: '#f59e0b' },
     new_review: { icon: '⭐', color: '#f59e0b' },

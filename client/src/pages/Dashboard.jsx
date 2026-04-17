@@ -39,12 +39,12 @@ export default function Dashboard() {
 
   const cards = stats
     ? [
-        { label: "Total Credits", value: stats.credits ?? 0 },
-        { label: "Pending Requests", value: stats.pendingRequests ?? 0 },
-        { label: "Accepted Requests", value: stats.acceptedRequests ?? 0 },
-        { label: "Completed Services", value: stats.completedServices ?? 0 },
-        { label: "Total Earnings", value: `${stats.totalEarnings ?? 0}h` },
-      ]
+      { label: "Total Credits", value: stats.credits ?? 0 },
+      { label: "Pending Requests", value: stats.pendingRequests ?? 0 },
+      { label: "Accepted Requests", value: stats.acceptedRequests ?? 0 },
+      { label: "Completed Services", value: stats.completedServices ?? 0 },
+      { label: "Total Earnings", value: `${stats.totalEarnings ?? 0}h` },
+    ]
     : [];
 
   return (
@@ -132,6 +132,21 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-500">
                           {meeting.requester?.name || "Requester"} • {meeting.provider?.name || "Provider"}
                         </p>
+                        {meeting.scheduledAt && (
+                          <p className="mt-2 text-xs font-semibold text-slate-500">
+                            {new Date(meeting.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                          </p>
+                        )}
+                        {meeting.meetingUrl && (
+                          <a
+                            href={meeting.meetingUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-3 inline-flex premium-button premium-button-ghost px-4 py-2 text-xs"
+                          >
+                            Join meeting
+                          </a>
+                        )}
                       </div>
                     ))
                   ) : (
