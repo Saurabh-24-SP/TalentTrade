@@ -5,14 +5,14 @@ const { Review } = require("../models/Others");
 const User = require("../models/User");
 const { protect } = require("../middleware/authMiddleware");
 
-// ✅ REVIEW DO
+// ✅ GIVE REVIEW
 // POST /api/reviews/create
 router.post("/create", protect, async (req, res) => {
     try {
         const { revieweeId, serviceId, transactionId, rating, comment } = req.body;
 
         if (!revieweeId || !rating) {
-            return res.status(400).json({ message: "RevieweeId aur rating required hai" });
+            return res.status(400).json({ message: "RevieweeId and rating are required" });
         }
 
         const review = await Review.create({
@@ -24,7 +24,7 @@ router.post("/create", protect, async (req, res) => {
             comment: comment || "",
         });
 
-        // Average rating update karo
+        // Update average rating
         const allReviews = await Review.find({ reviewee: revieweeId });
         const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
 
@@ -32,13 +32,13 @@ router.post("/create", protect, async (req, res) => {
             rating: avgRating.toFixed(1),
             totalReviews: allReviews.length,
         });
-        // Provider ko review notification
+        // Review notification to provider
         createNotification({
             recipientId: revieweeId,
             senderId: req.user._id,
             type: 'new_review',
-            title: 'Naya Review Mila! ⭐',
-            body: `${req.user.name} ne tumhe ${rating} star diya`,
+            title: 'New Review Received! ⭐',
+            body: `${req.user.name} gave you ${rating} star(s)`,
             actionUrl: `/profile/${revieweeId}`,
         });
 
@@ -50,7 +50,7 @@ router.post("/create", protect, async (req, res) => {
     }
 });
 
-// ✅ KISI KI REVIEWS DEKHO
+// ✅ VIEW USERS REVIEWS
 // GET /api/reviews/user/:id
 router.get("/user/:id", async (req, res) => {
     try {

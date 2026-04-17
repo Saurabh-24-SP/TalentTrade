@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import API from "../utils/api";
 import Navbar from "../components/Navbar";
+import { GlassCard, PageShell, PremiumButton, Reveal, SectionHeading } from "../components/PremiumMotion";
 
 export default function Profile() {
     const { user, setUser } = useAuth();
@@ -17,7 +18,7 @@ export default function Profile() {
     const [avatarPreview, setAvatarPreview] = useState("");
     const fileInputRef = useRef(null);
 
-    // user.avatar update hone pe preview update karo
+    // Update preview when user.avatar updates
     useEffect(() => {
         if (user?.avatar) {
             setAvatarPreview(user.avatar);
@@ -70,51 +71,57 @@ export default function Profile() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <PageShell>
             <Navbar />
-            <div className="max-w-2xl mx-auto px-4 py-10">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-1">My Profile</h1>
-                    <p className="text-gray-500">Update your personal information</p>
-                </div>
+            <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+                <Reveal>
+                    <div className="mb-8">
+                        <SectionHeading
+                            eyebrow="Account"
+                            title="My profile"
+                            description="Update your personal details and keep your profile presentation polished."
+                        />
+                    </div>
+                </Reveal>
 
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+                <Reveal delay={0.05}>
+                    <GlassCard className="p-8">
                     {/* Avatar Section */}
-                    <div className="flex items-center gap-6 mb-8">
+                    <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-center">
                         <div className="relative">
                             {avatarPreview ? (
                                 <img
                                     src={avatarPreview}
                                     alt="Profile"
-                                    className="w-20 h-20 rounded-full object-cover border-4 border-indigo-100"
+                                    className="h-24 w-24 rounded-full object-cover ring-4 ring-indigo-100 transition duration-300 hover:scale-105"
                                 />
                             ) : (
-                                <div className="w-20 h-20 rounded-full bg-indigo-600 text-white text-3xl font-bold flex items-center justify-center border-4 border-indigo-100">
+                                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-sky-500 text-3xl font-bold text-white ring-4 ring-indigo-100 transition duration-300 hover:scale-105">
                                     {user?.name?.[0]?.toUpperCase()}
                                 </div>
                             )}
                             {avatarLoading && (
-                                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center">
-                                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                                 </div>
                             )}
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="absolute bottom-0 right-0 bg-indigo-600 text-white w-7 h-7 rounded-full flex items-center justify-center hover:bg-indigo-700 transition shadow-md"
+                                className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-sky-500 text-white shadow-lg shadow-indigo-500/25 transition hover:scale-105"
                             >
                                 📷
                             </button>
                         </div>
 
                         <div>
-                            <h2 className="text-xl font-bold text-gray-800">{user?.name}</h2>
-                            <p className="text-gray-500 text-sm">{user?.email}</p>
-                            <div className="flex gap-2 mt-1">
-                                <span className="bg-indigo-50 text-indigo-600 text-xs px-2 py-0.5 rounded-full font-semibold capitalize">
+                            <h2 className="text-2xl font-bold text-slate-900">{user?.name}</h2>
+                            <p className="text-sm text-slate-500">{user?.email}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold capitalize text-indigo-600">
                                     {user?.role}
                                 </span>
-                                <span className="bg-green-50 text-green-600 text-xs px-2 py-0.5 rounded-full font-semibold">
+                                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
                                     ⏱ {user?.timeCredits} Credits
                                 </span>
                             </div>
@@ -122,7 +129,7 @@ export default function Profile() {
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={avatarLoading}
-                                className="mt-2 text-xs text-indigo-600 hover:underline disabled:opacity-50"
+                                className="mt-3 text-xs font-semibold text-indigo-600 transition hover:text-indigo-700 disabled:opacity-50"
                             >
                                 {avatarLoading ? "Uploading..." : "📷 Change Profile Photo"}
                             </button>
@@ -138,58 +145,59 @@ export default function Profile() {
                     </div>
 
                     {success && (
-                        <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg text-sm mb-4">
+                        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                             {success}
                         </div>
                     )}
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm mb-4">
+                        <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                             {error}
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Full Name</label>
+                            <label className="mb-1 block text-sm font-semibold text-slate-700">Full name</label>
                             <input
                                 type="text"
                                 value={form.name}
                                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                                className="premium-input"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Bio</label>
+                            <label className="mb-1 block text-sm font-semibold text-slate-700">Bio</label>
                             <textarea
                                 placeholder="Tell others about yourself..."
                                 value={form.bio}
                                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
                                 rows={3}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 resize-none"
+                                className="premium-textarea"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                Skills <span className="text-gray-400 font-normal">(comma separated)</span>
+                            <label className="mb-1 block text-sm font-semibold text-slate-700">
+                                Skills <span className="font-normal text-slate-400">(comma separated)</span>
                             </label>
                             <input
                                 type="text"
                                 placeholder="e.g. Coding, Teaching, Cooking"
                                 value={form.skills}
                                 onChange={(e) => setForm({ ...form, skills: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                                className="premium-input"
                             />
                         </div>
-                        <button
+                        <PremiumButton
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition"
+                            className="w-full py-3"
                         >
                             {loading ? "Saving..." : "Save Changes"}
-                        </button>
+                        </PremiumButton>
                     </form>
-                </div>
+                </GlassCard>
+                </Reveal>
             </div>
-        </div>
+        </PageShell>
     );
 }

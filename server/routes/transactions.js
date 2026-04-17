@@ -4,41 +4,52 @@ const router = express.Router();
 const Transaction = require("../models/Transaction");
 const Service = require("../models/Service");
 const User = require("../models/User");
+const Request = require("../models/Request");
 const { protect } = require("../middleware/authMiddleware");
 const { sendEmail } = require("../services/emailService");
 
-// ✅ SERVICE REQUEST KARO
+// ✅ REQUEST SERVICE
 // POST /api/transactions/create
 router.post("/create", protect, async (req, res) => {
     try {
         const { serviceId, message } = req.body;
 
-        // Service dhundho
+        // Find service
         const service = await Service.findById(serviceId);
         if (!service) {
             return res.status(404).json({ message: "Service not found" });
         }
 
-        // Apni service book nahi kar sakte
+        // Cannot book own service
         if (service.provider.toString() === req.user._id.toString()) {
-            return res.status(400).json({ message: "Aap apni khud ki service book nahi kar sakte" });
+            return res.status(400).json({ message: "You cannot book your own service" });
         }
 
-        // Credits check karo
+        // Check credits
         const requester = await User.findById(req.user._id);
         if (requester.timeCredits < service.hoursRequired) {
             return res.status(400).json({
-                message: `Kam credits hain! Chahiye: ${service.hoursRequired}, Aapke paas: ${requester.timeCredits}`
+                message: `Not enough credits! Required: ${service.hoursRequired}, You have: ${requester.timeCredits}`
             });
         }
 
-        // Transaction banao
+        // Create transaction
         const transaction = await Transaction.create({
             requester: req.user._id,
             provider: service.provider,
             service: serviceId,
             hoursSpent: service.hoursRequired,
             message: message || "",
+        });
+
+        await Request.create({
+            requester: req.user._id,
+            provider: service.provider,
+            service: serviceId,
+            transaction: transaction._id,
+            message: message || "",
+            hoursRequested: service.hoursRequired,
+            status: "pending",
         });
 
         // ✅ Provider ko booking request email
@@ -52,13 +63,13 @@ router.post("/create", protect, async (req, res) => {
             bookingId: transaction._id,
         }).catch(err => console.error('Booking request email failed:', err.message));
           
-        // Provider ko notification
+        // Notification to provider
         createNotification({
             recipientId: service.provider,
             senderId: req.user._id,
             type: 'booking_request',
-            title: 'Naya Booking Request! 🔔',
-            body: `${requester.name} ne "${service.title}" book karna chahta hai`,
+            title: 'New Booking Request! 🔔',
+            body: `${requester.name} wants to book "${service.title}"`,
             actionUrl: '/transactions',
         });
         return res.status(201).json(transaction);
@@ -69,7 +80,7 @@ router.post("/create", protect, async (req, res) => {
     }
 });
 
-// ✅ REQUEST ACCEPT KARO
+// ✅ ACCEPT REQUEST
 // PUT /api/transactions/accept/:id
 router.put("/accept/:id", protect, async (req, res) => {
     try {
@@ -79,22 +90,48 @@ router.put("/accept/:id", protect, async (req, res) => {
             return res.status(404).json({ message: "Transaction not found" });
         }
 
-        // Provider ID se check karo — role se nahi
+        // Check by Provider ID — not role
         if (transaction.provider.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: "Sirf provider accept kar sakta hai" });
+            return res.status(403).json({ message: "Only the provider can accept" });
         }
 
         if (transaction.status !== "pending") {
-            return res.status(400).json({ message: "Yeh transaction already processed hai" });
+            return res.status(400).json({ message: "This transaction is already processed" });
         }
 
+        const [requester, provider, service] = await Promise.all([
+            User.findById(transaction.requester),
+            User.findById(transaction.provider),
+            Service.findById(transaction.service),
+        ]);
+
+        if (!requester || !provider || !service) {
+            return res.status(404).json({ message: "Related transaction data not found" });
+        }
+
+        if (requester.timeCredits < transaction.hoursSpent) {
+            return res.status(400).json({
+                message: `Requester has insufficient credits. Required: ${transaction.hoursSpent}, Available: ${requester.timeCredits}`,
+            });
+        }
+
+        const updatedRequester = await User.findByIdAndUpdate(
+            transaction.requester,
+            { $inc: { timeCredits: -transaction.hoursSpent } },
+            { new: true }
+        );
+
         transaction.status = "accepted";
+        transaction.creditsLocked = true;
         await transaction.save();
 
+        await Request.findOneAndUpdate(
+            { transaction: transaction._id },
+            { status: "accepted" },
+            { new: true }
+        );
+
         // ✅ Requester ko confirmation email
-        const requester = await User.findById(transaction.requester);
-        const provider = await User.findById(transaction.provider);
-        const service = await Service.findById(transaction.service);
         sendEmail(requester.email, 'bookingConfirmation', {
             requesterName: requester.name,
             providerName: provider.name,
@@ -103,19 +140,45 @@ router.put("/accept/:id", protect, async (req, res) => {
             credits: transaction.hoursSpent,
             bookingId: transaction._id,
         }).catch(err => console.error('Confirmation email failed:', err.message));
+
+        sendEmail(requester.email, 'creditAlert', {
+            userName: requester.name,
+            type: 'deducted',
+            amount: transaction.hoursSpent,
+            reason: `Booking accepted for "${service.title}" — ${transaction.hoursSpent} credits reserved`,
+            newBalance: updatedRequester.timeCredits,
+        }).catch(err => console.error('Credit deduct email failed:', err.message));
   
-        // Requester ko notification
+        // Notification to requester
         createNotification({
             recipientId: transaction.requester,
             senderId: req.user._id,
             type: 'booking_accepted',
-            title: 'Booking Accept Ho Gayi! ✅',
-            body: `Tumhari booking accept ho gayi`,
+            title: 'Booking Accepted! ✅',
+            body: `Your booking has been accepted`,
+            data: {
+                newBalance: updatedRequester.timeCredits,
+                deductedCredits: transaction.hoursSpent,
+            },
             actionUrl: '/transactions',
+        });
+
+        createNotification({
+            recipientId: transaction.requester,
+            senderId: req.user._id,
+            type: 'credit_deducted',
+            title: `💸 ${transaction.hoursSpent} Credits Deducted`,
+            body: `Credits were deducted as soon as your booking was accepted`,
+            data: {
+                newBalance: updatedRequester.timeCredits,
+                deductedCredits: transaction.hoursSpent,
+            },
+            actionUrl: '/credits',
         });
         return res.json({
             message: "Transaction accepted! ✅",
-            transaction
+            transaction,
+            requesterCredits: updatedRequester.timeCredits,
         });
 
     } catch (error) {
@@ -124,7 +187,7 @@ router.put("/accept/:id", protect, async (req, res) => {
     }
 });
 
-// ✅ TRANSACTION COMPLETE KARO — CREDITS TRANSFER HOGA
+// ✅ COMPLETE TRANSACTION — CREDITS WILL BE TRANSFERRED
 // PUT /api/transactions/complete/:id
 router.put("/complete/:id", protect, async (req, res) => {
     try {
@@ -135,16 +198,16 @@ router.put("/complete/:id", protect, async (req, res) => {
         }
 
         if (transaction.status !== "accepted") {
-            return res.status(400).json({ message: "Pehle transaction accept hona chahiye" });
+            return res.status(400).json({ message: "Transaction must be accepted first" });
         }
 
-        // Dono ko notification
+        // Notify both
         createNotification({
             recipientId: transaction.requester,
             senderId: transaction.provider,
             type: 'credit_deducted',
             title: `💸 ${transaction.hoursSpent} Credits Deducted`,
-            body: `Service complete — credits deduct ho gaye`,
+            body: `Service complete — credits deducted`,
             actionUrl: '/credits',
         });
 
@@ -153,51 +216,55 @@ router.put("/complete/:id", protect, async (req, res) => {
             senderId: transaction.requester,
             type: 'credit_earned',
             title: `💰 ${transaction.hoursSpent} Credits Earned!`,
-            body: `Service complete — credits mil gaye`,
+            body: `Service complete — credits earned`,
             actionUrl: '/credits',
         });
 
-        // Complete mark karo
+        // Mark complete
         transaction.status = "completed";
         transaction.completedAt = new Date();
         await transaction.save();
 
+        await Request.findOneAndUpdate(
+            { transaction: transaction._id },
+            { status: "completed" },
+            { new: true }
+        );
+
         // 💰 Credits Transfer:
-        // Requester ke credits kam karo
-        await User.findByIdAndUpdate(transaction.requester, {
-            $inc: { timeCredits: -transaction.hoursSpent }
-        });
+        // New flow: requester's credits are locked at accept.
+        // Legacy fallback: if credits were never locked, deduct now.
+        let requester;
+        if (transaction.creditsLocked) {
+            requester = await User.findById(transaction.requester);
+        } else {
+            requester = await User.findByIdAndUpdate(
+                transaction.requester,
+                { $inc: { timeCredits: -transaction.hoursSpent } },
+                { new: true }
+            );
+        }
 
-        // Provider ke credits badhao
-        await User.findByIdAndUpdate(transaction.provider, {
-            $inc: { timeCredits: +transaction.hoursSpent }
-        });
+        const provider = await User.findByIdAndUpdate(
+            transaction.provider,
+            { $inc: { timeCredits: +transaction.hoursSpent } },
+            { new: true }
+        );
 
-        // Service bookings count badhao
+        // Increase service bookings count
         await Service.findByIdAndUpdate(transaction.service, {
             $inc: { totalBookings: 1 }
         });
 
-        // ✅ Updated balances fetch karo email ke liye
-        const requester = await User.findById(transaction.requester);
-        const provider = await User.findById(transaction.provider);
+        // ✅ Fetch updated balances for email
         const service = await Service.findById(transaction.service);
-
-        // ✅ Requester ko credits deducted email
-        sendEmail(requester.email, 'creditAlert', {
-            userName: requester.name,
-            type: 'deducted',
-            amount: transaction.hoursSpent,
-            reason: `Service "${service.title}" complete hua — ${transaction.hoursSpent} credits deducted`,
-            newBalance: requester.timeCredits,
-        }).catch(err => console.error('Credit deduct email failed:', err.message));
 
         // ✅ Provider ko credits earned email
         sendEmail(provider.email, 'creditAlert', {
             userName: provider.name,
             type: 'earned',
             amount: transaction.hoursSpent,
-            reason: `Service "${service.title}" complete hua — ${transaction.hoursSpent} credits earned`,
+            reason: `Service "${service.title}" completed — ${transaction.hoursSpent} credits earned`,
             newBalance: provider.timeCredits,
         }).catch(err => console.error('Credit earn email failed:', err.message));
 
@@ -212,7 +279,7 @@ router.put("/complete/:id", protect, async (req, res) => {
         }, 5000);
 
         return res.json({
-            message: `Transaction complete! ${transaction.hoursSpent} credits transfer ho gaye ✅`,
+            message: `Transaction complete! ${transaction.hoursSpent} credits transferred ✅`,
             transaction
         });
 
@@ -221,7 +288,7 @@ router.put("/complete/:id", protect, async (req, res) => {
     }
 });
 
-// ✅ TRANSACTION CANCEL KARO
+// ✅ CANCEL TRANSACTION
 // PUT /api/transactions/cancel/:id
 router.put("/cancel/:id", protect, async (req, res) => {
     try {
@@ -231,7 +298,7 @@ router.put("/cancel/:id", protect, async (req, res) => {
             return res.status(404).json({ message: "Transaction not found" });
         }
 
-        // Sirf requester ya provider cancel kar sakta hai
+        // Only requester or provider can cancel
         const isRequester = transaction.requester.toString() === req.user._id.toString();
         const isProvider = transaction.provider.toString() === req.user._id.toString();
 
@@ -240,20 +307,59 @@ router.put("/cancel/:id", protect, async (req, res) => {
         }
 
         if (transaction.status === "completed") {
-            return res.status(400).json({ message: "Completed transaction cancel nahi ho sakta" });
+            return res.status(400).json({ message: "Completed transaction cannot be cancelled" });
+        }
+
+        let updatedRequester = null;
+        const shouldRefundLockedCredits = transaction.status === "accepted" && transaction.creditsLocked;
+
+        if (shouldRefundLockedCredits) {
+            updatedRequester = await User.findByIdAndUpdate(
+                transaction.requester,
+                { $inc: { timeCredits: transaction.hoursSpent } },
+                { new: true }
+            );
         }
 
         transaction.status = "cancelled";
+        if (shouldRefundLockedCredits) {
+            transaction.creditsLocked = false;
+        }
         await transaction.save();
 
-        return res.json({ message: "Transaction cancelled", transaction });
+        await Request.findOneAndUpdate(
+            { transaction: transaction._id },
+            { status: "cancelled" },
+            { new: true }
+        );
+
+        if (shouldRefundLockedCredits && updatedRequester) {
+            createNotification({
+                recipientId: transaction.requester,
+                senderId: req.user._id,
+                type: 'system',
+                title: `Credits Refunded ↩️`,
+                body: `${transaction.hoursSpent} credits were refunded because the accepted booking was cancelled`,
+                data: {
+                    newBalance: updatedRequester.timeCredits,
+                    refundedCredits: transaction.hoursSpent,
+                },
+                actionUrl: '/credits',
+            });
+        }
+
+        return res.json({
+            message: "Transaction cancelled",
+            transaction,
+            requesterCredits: updatedRequester?.timeCredits,
+        });
 
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }
 });
 
-// ✅ MERI SAARI TRANSACTIONS DEKHO
+// ✅ VIEW ALL MY TRANSACTIONS
 // GET /api/transactions/my
 router.get("/my", protect, async (req, res) => {
     try {

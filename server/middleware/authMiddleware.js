@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-// Login check — kya token hai?
+// Login check — token verification
 const protect = async (req, res, next) => {
     let token;
 
@@ -10,13 +10,13 @@ const protect = async (req, res, next) => {
         req.headers.authorization.startsWith("Bearer")
     ) {
         try {
-            // Token nikalo
+            // Extract token
             token = req.headers.authorization.split(" ")[1];
 
-            // Token verify karo
+            // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-            // User dhundho
+            // Find user
             req.user = await User.findById(decoded.id).select("-password");
 
             return next();
@@ -31,7 +31,7 @@ const protect = async (req, res, next) => {
     }
 };
 
-// Sirf Admin access
+// Admin access only
 const adminOnly = (req, res, next) => {
     if (req.user && req.user.role === "admin") {
         return next();
@@ -39,7 +39,7 @@ const adminOnly = (req, res, next) => {
     return res.status(403).json({ message: "Access denied — Admins only" });
 };
 
-// Provider ya Admin access
+// Provider or Admin access
 const providerOrAdmin = (req, res, next) => {
     if (
         req.user &&

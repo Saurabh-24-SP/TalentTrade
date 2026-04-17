@@ -98,7 +98,7 @@ export default function SearchPage() {
             (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
             () => {
                 setFilters(f => ({ ...f, nearMe: false }));
-                alert('Location access nahi mila!');
+                alert('Location access denied!');
             }
         );
     }, [filters.nearMe]);
@@ -290,8 +290,8 @@ export default function SearchPage() {
                 ) : services.length === 0 ? (
                     <div className="text-center py-20">
                         <div className="text-6xl mb-4">🔍</div>
-                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">Koi service nahi mili</h3>
-                        <p className="text-gray-500 dark:text-gray-400 mb-6">Filters change karke try karo</p>
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">No services found</h3>
+                        <p className="text-gray-500 dark:text-gray-400 mb-6">Try changing your filters</p>
                         <button onClick={clearFilters}
                             className="bg-violet-600 text-white px-6 py-3 rounded-xl hover:bg-violet-700 transition-colors">
                             Clear all filters

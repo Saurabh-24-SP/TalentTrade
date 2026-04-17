@@ -4,14 +4,14 @@ const { Dispute } = require("../models/Others");
 const Transaction = require("../models/Transaction");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
 
-// ✅ DISPUTE UTHAO
+// ✅ RAISE DISPUTE
 // POST /api/disputes/raise
 router.post("/raise", protect, async (req, res) => {
     try {
         const { againstUserId, transactionId, reason } = req.body;
 
         if (!againstUserId || !transactionId || !reason) {
-            return res.status(400).json({ message: "Sab fields required hain" });
+            return res.status(400).json({ message: "All fields are required" });
         }
 
         const dispute = await Dispute.create({
@@ -21,7 +21,7 @@ router.post("/raise", protect, async (req, res) => {
             reason,
         });
 
-        // Transaction disputed mark karo
+        // Mark transaction as disputed
         await Transaction.findByIdAndUpdate(transactionId, {
             status: "disputed"
         });
@@ -33,7 +33,7 @@ router.post("/raise", protect, async (req, res) => {
     }
 });
 
-// ✅ SAARE DISPUTES DEKHO — SIRF ADMIN
+// ✅ VIEW ALL DISPUTES — ADMIN ONLY
 // GET /api/disputes/all
 router.get("/all", protect, adminOnly, async (req, res) => {
     try {
@@ -50,7 +50,7 @@ router.get("/all", protect, adminOnly, async (req, res) => {
     }
 });
 
-// ✅ DISPUTE RESOLVE KARO — SIRF ADMIN
+// ✅ RESOLVE DISPUTE — ADMIN ONLY
 // PUT /api/disputes/resolve/:id
 router.put("/resolve/:id", protect, adminOnly, async (req, res) => {
     try {

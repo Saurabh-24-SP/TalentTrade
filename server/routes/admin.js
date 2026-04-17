@@ -30,7 +30,7 @@ router.get("/dashboard", protect, adminOnly, async (req, res) => {
     }
 });
 
-// ✅ SAARE USERS DEKHO
+// ✅ VIEW ALL USERS
 // GET /api/admin/users
 router.get("/users", protect, adminOnly, async (req, res) => {
     try {
@@ -45,7 +45,7 @@ router.get("/users", protect, adminOnly, async (req, res) => {
     }
 });
 
-// ✅ USER VERIFY KARO
+// ✅ VERIFY USER
 // PUT /api/admin/verify/:id
 router.put("/verify/:id", protect, adminOnly, async (req, res) => {
     try {
@@ -64,7 +64,7 @@ router.put("/verify/:id", protect, adminOnly, async (req, res) => {
     }
 });
 
-// ✅ USER BAN KARO
+// ✅ BAN USER
 // PUT /api/admin/ban/:id
 router.put("/ban/:id", protect, adminOnly, async (req, res) => {
     try {

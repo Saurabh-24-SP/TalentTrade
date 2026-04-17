@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../utils/api";
 import Navbar from "../components/Navbar";
+import { GlassCard, PageShell, PremiumButton, Reveal, SectionHeading } from "../components/PremiumMotion";
 
 const CATEGORIES = ["education", "tech", "health", "home", "creative", "transport", "other"];
 
@@ -33,22 +34,25 @@ export default function PostService() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <PageShell>
             <Navbar />
 
-            <div className="max-w-2xl mx-auto px-4 py-10">
+            <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+                <Reveal>
+                    <div className="mb-8">
+                        <SectionHeading
+                            eyebrow="Create listing"
+                            title="Post a service"
+                            description="Offer your skills and earn time credits with a polished, premium listing experience."
+                        />
+                    </div>
+                </Reveal>
 
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-1">Post a Service</h1>
-                    <p className="text-gray-500">Offer your skills and earn time credits</p>
-                </div>
-
-                {/* Form Card */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+                <Reveal delay={0.04}>
+                    <GlassCard className="p-8">
 
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm mb-6">
+                        <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                             {error}
                         </div>
                     )}
@@ -66,7 +70,7 @@ export default function PostService() {
                                 value={form.title}
                                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                                 required
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                                className="premium-input"
                             />
                         </div>
 
@@ -81,7 +85,7 @@ export default function PostService() {
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                                 required
                                 rows={4}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 resize-none"
+                                className="premium-textarea"
                             />
                         </div>
 
@@ -93,7 +97,7 @@ export default function PostService() {
                             <select
                                 value={form.category}
                                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                                className="premium-select"
                             >
                                 {CATEGORIES.map((cat) => (
                                     <option key={cat} value={cat} className="capitalize">
@@ -115,7 +119,7 @@ export default function PostService() {
                                 value={form.hoursRequired}
                                 onChange={(e) => setForm({ ...form, hoursRequired: Number(e.target.value) })}
                                 required
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                                className="premium-input"
                             />
                         </div>
 
@@ -129,22 +133,23 @@ export default function PostService() {
                                 placeholder="e.g. react, javascript, coding"
                                 value={form.tags}
                                 onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                                className="premium-input"
                             />
                         </div>
 
                         {/* Submit */}
-                        <button
+                        <PremiumButton
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition"
+                            className="w-full py-3"
                         >
                             {loading ? "Posting..." : "Post Service 🚀"}
-                        </button>
+                        </PremiumButton>
 
                     </form>
-                </div>
+                </GlassCard>
+                </Reveal>
             </div>
-        </div>
+        </PageShell>
     );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import API from "../utils/api";
 import Navbar from "../components/Navbar";
+import { GlassCard, PageShell, Reveal, SectionHeading } from "../components/PremiumMotion";
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState({});
@@ -14,182 +15,146 @@ export default function AdminDashboard() {
             API.get("/admin/dashboard"),
             API.get("/admin/users"),
             API.get("/disputes/all"),
-        ]).then(([s, u, d]) => {
-            setStats(s.data);
-            setUsers(u.data);
-            setDisputes(d.data);
+        ]).then(([statsResponse, usersResponse, disputesResponse]) => {
+            setStats(statsResponse.data);
+            setUsers(usersResponse.data);
+            setDisputes(disputesResponse.data);
         }).catch((err) => console.error(err))
             .finally(() => setLoading(false));
     }, []);
 
     const verifyUser = async (id) => {
         await API.put(`/admin/verify/${id}`);
-        setUsers(users.map((u) => u._id === id ? { ...u, isVerified: true } : u));
+        setUsers(users.map((user) => (user._id === id ? { ...user, isVerified: true } : user)));
     };
 
     const banUser = async (id) => {
         if (!window.confirm("Are you sure you want to ban this user?")) return;
         await API.put(`/admin/ban/${id}`);
-        setUsers(users.map((u) => u._id === id ? { ...u, isBanned: true } : u));
+        setUsers(users.map((user) => (user._id === id ? { ...user, isBanned: true } : user)));
     };
 
     const resolveDispute = async (id) => {
         const note = prompt("Enter resolution note:");
         if (!note) return;
         await API.put(`/disputes/resolve/${id}`, { adminNote: note });
-        setDisputes(disputes.map((d) =>
-            d._id === id ? { ...d, status: "resolved", adminNote: note } : d
-        ));
+        setDisputes(disputes.map((dispute) => (dispute._id === id ? { ...dispute, status: "resolved", adminNote: note } : dispute)));
     };
 
-    if (loading) return (
-        <div className="min-h-screen bg-gray-50">
-            <Navbar />
-            <div className="flex justify-center items-center h-64 text-gray-400">Loading...</div>
-        </div>
-    );
+    if (loading) {
+        return (
+            <PageShell>
+                <Navbar />
+                <div className="flex h-64 items-center justify-center text-slate-400">Loading...</div>
+            </PageShell>
+        );
+    }
+
+    const cards = [
+        { label: "Total users", value: stats.totalUsers, icon: "👥", color: "text-indigo-600", bg: "bg-indigo-50" },
+        { label: "Total services", value: stats.totalServices, icon: "📋", color: "text-emerald-600", bg: "bg-emerald-50" },
+        { label: "Total transactions", value: stats.totalTransactions, icon: "⏱", color: "text-amber-600", bg: "bg-amber-50" },
+        { label: "Open disputes", value: stats.openDisputes, icon: "⚠️", color: "text-rose-500", bg: "bg-rose-50" },
+    ];
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <PageShell>
             <Navbar />
-            <div className="max-w-6xl mx-auto px-4 py-8">
+            <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+                <Reveal>
+                    <div className="mb-6">
+                        <SectionHeading
+                            eyebrow="Admin"
+                            title="Admin dashboard"
+                            description="Manage users, disputes, and platform metrics from a premium operations console."
+                        />
+                    </div>
+                </Reveal>
 
-                {/* Header */}
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-1">🛠️ Admin Dashboard</h1>
-                    <p className="text-gray-500">Manage users, disputes, and platform stats</p>
-                </div>
-
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    {[
-                        { label: "Total Users", value: stats.totalUsers, icon: "👥", color: "text-indigo-600", bg: "bg-indigo-50" },
-                        { label: "Total Services", value: stats.totalServices, icon: "📋", color: "text-green-600", bg: "bg-green-50" },
-                        { label: "Total Transactions", value: stats.totalTransactions, icon: "⏱", color: "text-yellow-600", bg: "bg-yellow-50" },
-                        { label: "Open Disputes", value: stats.openDisputes, icon: "⚠️", color: "text-red-500", bg: "bg-red-50" },
-                    ].map(({ label, value, icon, color, bg }) => (
-                        <div key={label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 text-center">
-                            <div className="text-2xl mb-1">{icon}</div>
-                            <div className={`text-3xl font-extrabold ${color}`}>{value ?? 0}</div>
-                            <div className={`text-xs font-semibold mt-1 px-2 py-0.5 rounded-full inline-block ${bg} ${color}`}>
-                                {label}
+                <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+                    {cards.map((card) => (
+                        <GlassCard key={card.label} className="p-5 text-center">
+                            <div className="mb-1 text-2xl">{card.icon}</div>
+                            <div className={`text-3xl font-extrabold ${card.color}`}>{card.value ?? 0}</div>
+                            <div className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${card.bg} ${card.color}`}>
+                                {card.label}
                             </div>
-                        </div>
+                        </GlassCard>
                     ))}
                 </div>
 
-                {/* Tabs */}
-                <div className="flex gap-1 mb-6 border-b border-gray-200">
-                    {["overview", "users", "disputes"].map((t) => (
+                <div className="mb-6 flex gap-2 border-b border-slate-200">
+                    {["overview", "users", "disputes"].map((item) => (
                         <button
-                            key={t}
-                            onClick={() => setTab(t)}
-                            className={`px-5 py-2.5 text-sm font-semibold capitalize transition border-b-2 -mb-px
-                ${tab === t
-                                    ? "border-indigo-600 text-indigo-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
-                                }`}
+                            key={item}
+                            onClick={() => setTab(item)}
+                            className={`border-b-2 px-5 py-3 text-sm font-semibold capitalize transition ${tab === item ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
                         >
-                            {t === "users" ? `Users (${users.length})` : ""}
-                            {t === "disputes" ? `Disputes (${disputes.filter(d => d.status === "open").length})` : ""}
-                            {t === "overview" ? "Overview" : ""}
+                            {item === "users" ? `Users (${users.length})` : item === "disputes" ? `Disputes (${disputes.filter((dispute) => dispute.status === "open").length})` : "Overview"}
                         </button>
                     ))}
                 </div>
 
-                {/* Overview Tab */}
                 {tab === "overview" && (
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 text-center text-gray-400">
-                        Select Users or Disputes tab to manage platform.
-                    </div>
+                    <GlassCard className="p-8 text-center text-slate-500">
+                        Select the Users or Disputes tab to manage the platform.
+                    </GlassCard>
                 )}
 
-                {/* Users Tab */}
                 {tab === "users" && (
                     <div className="space-y-3">
-                        {users.map((u) => (
-                            <div key={u._id} className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex justify-between items-center">
+                        {users.map((user) => (
+                            <GlassCard key={user._id} className="flex items-center justify-between gap-4 px-5 py-4">
                                 <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-gray-800">{u.name}</span>
-                                        {u.isVerified && (
-                                            <span className="bg-green-50 text-green-600 text-xs px-2 py-0.5 rounded-full font-semibold">
-                                                ✓ Verified
-                                            </span>
-                                        )}
-                                        {u.isBanned && (
-                                            <span className="bg-red-50 text-red-600 text-xs px-2 py-0.5 rounded-full font-semibold">
-                                                Banned
-                                            </span>
-                                        )}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-bold text-slate-900">{user.name}</span>
+                                        {user.isVerified && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-600">Verified</span>}
+                                        {user.isBanned && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">Banned</span>}
                                     </div>
-                                    <p className="text-sm text-gray-400 mt-0.5">
-                                        {u.email} · {u.role} · {u.timeCredits} credits
-                                    </p>
+                                    <p className="mt-0.5 text-sm text-slate-400">{user.email} · {user.role} · {user.timeCredits} credits</p>
                                 </div>
+
                                 <div className="flex gap-2">
-                                    {!u.isVerified && !u.isBanned && (
-                                        <button
-                                            onClick={() => verifyUser(u._id)}
-                                            className="bg-green-50 text-green-600 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-100 transition"
-                                        >
-                                            Verify
-                                        </button>
+                                    {!user.isVerified && !user.isBanned && (
+                                        <button onClick={() => verifyUser(user._id)} className="rounded-2xl bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-100">Verify</button>
                                     )}
-                                    {!u.isBanned && u.role !== "admin" && (
-                                        <button
-                                            onClick={() => banUser(u._id)}
-                                            className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition"
-                                        >
-                                            Ban
-                                        </button>
+                                    {!user.isBanned && user.role !== "admin" && (
+                                        <button onClick={() => banUser(user._id)} className="rounded-2xl bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-100">Ban</button>
                                     )}
                                 </div>
-                            </div>
+                            </GlassCard>
                         ))}
                     </div>
                 )}
 
-                {/* Disputes Tab */}
                 {tab === "disputes" && (
                     <div className="space-y-3">
                         {disputes.length === 0 ? (
-                            <div className="text-center py-10 text-gray-400">No disputes found.</div>
-                        ) : disputes.map((d) => (
-                            <div key={d._id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                                <div className="flex justify-between items-start">
+                            <GlassCard className="py-10 text-center text-slate-500">No disputes found.</GlassCard>
+                        ) : disputes.map((dispute) => (
+                            <GlassCard key={dispute._id} className="p-5">
+                                <div className="flex items-start justify-between gap-4">
                                     <div>
-                                        <p className="font-bold text-gray-800 mb-1">
-                                            {d.raisedBy?.name} vs {d.againstUser?.name}
-                                        </p>
-                                        <p className="text-sm text-gray-500">{d.reason}</p>
-                                        {d.adminNote && (
-                                            <p className="text-sm text-green-600 mt-1">✓ {d.adminNote}</p>
-                                        )}
+                                        <p className="mb-1 font-bold text-slate-900">{dispute.raisedBy?.name} vs {dispute.againstUser?.name}</p>
+                                        <p className="text-sm text-slate-500">{dispute.reason}</p>
+                                        {dispute.adminNote && <p className="mt-1 text-sm text-emerald-600">✓ {dispute.adminNote}</p>}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className={`text-xs font-semibold px-3 py-1 rounded-full capitalize
-                      ${d.status === "open"
-                                                ? "bg-yellow-50 text-yellow-600"
-                                                : "bg-green-50 text-green-600"
-                                            }`}>
-                                            {d.status}
+                                        <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${dispute.status === "open" ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
+                                            {dispute.status}
                                         </span>
-                                        {d.status === "open" && (
-                                            <button
-                                                onClick={() => resolveDispute(d._id)}
-                                                className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
-                                            >
+                                        {dispute.status === "open" && (
+                                            <button onClick={() => resolveDispute(dispute._id)} className="premium-button px-3 py-1.5 text-xs">
                                                 Resolve
                                             </button>
                                         )}
                                     </div>
                                 </div>
-                            </div>
+                            </GlassCard>
                         ))}
                     </div>
                 )}
             </div>
-        </div>
+        </PageShell>
     );
 }

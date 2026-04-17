@@ -1,188 +1,89 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import API from "../utils/api";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
+import { GlassCard, PageShell, Reveal, SectionHeading, Stagger, StaggerItem } from "../components/PremiumMotion";
 
-// ─── Star Rating Component ─────────────────────────────────────────────────────
-function StarRating({ value = 0, onChange, readonly = false, size = "md" }) {
-    const [hover, setHover] = useState(0);
-    const sizes = { sm: "w-4 h-4", md: "w-6 h-6", lg: "w-8 h-8" };
-    const sz = sizes[size];
-    const labels = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
-
+function StarRating({ value = 0 }) {
     return (
-        <div className="flex flex-col gap-1">
-            <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                        key={star}
-                        type="button"
-                        disabled={readonly}
-                        onMouseEnter={() => !readonly && setHover(star)}
-                        onMouseLeave={() => !readonly && setHover(0)}
-                        onClick={() => !readonly && onChange?.(star)}
-                        className={`transition-all ${readonly ? "cursor-default" : "cursor-pointer hover:scale-110"}`}
-                    >
-                        <svg className={`${sz} ${star <= (hover || value) ? "text-amber-400" : "text-gray-300"}`}
-                            fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                    </button>
-                ))}
-            </div>
-            {!readonly && (hover || value) > 0 && (
-                <span className="text-xs font-medium text-amber-600">{labels[hover || value]}</span>
-            )}
+        <div className="flex items-center gap-1 text-amber-400">
+            {Array.from({ length: 5 }).map((_, index) => (
+                <span key={index} className={index < Math.round(value) ? "text-amber-400" : "text-amber-200"}>★</span>
+            ))}
         </div>
     );
 }
 
-// ─── Review Card Component ─────────────────────────────────────────────────────
 function ReviewCard({ review }) {
-    const timeAgo = (date) => {
-        const s = Math.floor((Date.now() - new Date(date)) / 1000);
-        if (s < 60) return "abhi";
-        if (s < 3600) return `${Math.floor(s / 60)}m pehle`;
-        if (s < 86400) return `${Math.floor(s / 3600)}h pehle`;
-        return `${Math.floor(s / 86400)}d pehle`;
-    };
-
     return (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
-            <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center flex-shrink-0">
-                    {review.reviewer?.name?.[0]?.toUpperCase()}
+        <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-5 shadow-[0_10px_35px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+            <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-sky-500 font-bold text-white shadow-lg shadow-indigo-500/25">
+                    {review.reviewer?.name?.[0]?.toUpperCase() || "U"}
                 </div>
-                <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                        <span className="font-semibold text-gray-800 text-sm">{review.reviewer?.name}</span>
-                        <span className="text-xs text-gray-400">{timeAgo(review.createdAt)}</span>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="truncate font-semibold text-slate-900">{review.reviewer?.name || "Anonymous"}</p>
+                        <span className="text-xs text-slate-400">
+                            {new Date(review.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
                     </div>
-                    <StarRating value={review.rating} readonly size="sm" />
-                    {review.comment && (
-                        <p className="text-gray-600 text-sm mt-2 leading-relaxed">{review.comment}</p>
-                    )}
+                    <div className="mt-1">
+                        <StarRating value={review.rating} />
+                    </div>
+                    {review.comment && <p className="mt-3 text-sm leading-6 text-slate-600">{review.comment}</p>}
                 </div>
             </div>
         </div>
     );
 }
 
-// ─── Rating Summary Component ──────────────────────────────────────────────────
-function RatingSummary({ reviews }) {
-    if (!reviews || reviews.length === 0) return null;
-    const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
-    const breakdown = [5, 4, 3, 2, 1].map((star) => ({
-        star,
-        count: reviews.filter((r) => r.rating === star).length,
-    }));
-
+function ServiceMiniCard({ service }) {
     return (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
-            <div className="flex gap-6">
-                <div className="text-center flex-shrink-0">
-                    <div className="text-5xl font-bold text-gray-900">{avg.toFixed(1)}</div>
-                    <StarRating value={Math.round(avg)} readonly size="sm" />
-                    <div className="text-xs text-gray-400 mt-1">{reviews.length} reviews</div>
+        <Link to={`/services/${service._id}`} className="block h-full">
+            <div className="group h-full overflow-hidden rounded-3xl border border-slate-200/70 bg-white/85 shadow-[0_10px_35px_rgba(15,23,42,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
+                <div className="aspect-[4/3] bg-gradient-to-br from-indigo-100 via-sky-100 to-violet-100">
+                    {service.images?.[0]?.url ? (
+                        <img src={service.images[0].url} alt={service.title} className="h-full w-full object-cover" />
+                    ) : service.image ? (
+                        <img src={service.image} alt={service.title} className="h-full w-full object-cover" />
+                    ) : (
+                        <div className="flex h-full items-center justify-center text-4xl text-indigo-500">🛠️</div>
+                    )}
                 </div>
-                <div className="flex-1 space-y-1.5">
-                    {breakdown.map(({ star, count }) => {
-                        const pct = reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
-                        return (
-                            <div key={star} className="flex items-center gap-2 text-xs">
-                                <span className="text-gray-500 w-2">{star}</span>
-                                <svg className="w-3 h-3 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                </svg>
-                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-amber-400 rounded-full transition-all duration-500"
-                                        style={{ width: `${pct}%` }} />
-                                </div>
-                                <span className="text-gray-400 w-4 text-right">{count}</span>
+                <div className="p-4">
+                    <div className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600">
+                        {service.category}
+                    </div>
+                    <h3 className="mt-3 line-clamp-2 text-base font-bold text-slate-900">{service.title}</h3>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{service.description}</p>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-sky-500 font-bold text-white">
+                                {service.provider?.name?.[0]?.toUpperCase() || "P"}
                             </div>
-                        );
-                    })}
+                            <span>{service.provider?.name || "Provider"}</span>
+                        </div>
+                        <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600">
+                            ⏱ {service.hoursRequired}h
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        </Link>
     );
 }
 
-// ─── Write Review Modal ────────────────────────────────────────────────────────
-function WriteReviewModal({ service, onClose, onSuccess }) {
-    const { user } = useAuth();
-    const [rating, setRating] = useState(0);
-    const [comment, setComment] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (rating === 0) { setError("Please select a rating"); return; }
-        if (comment.trim().length < 10) { setError("Review kam se kam 10 characters ka hona chahiye"); return; }
-        setLoading(true);
-        try {
-            await API.post("/reviews/create", {
-                revieweeId: service.provider._id,
-                serviceId: service._id,
-                rating,
-                comment: comment.trim(),
-            });
-            onSuccess?.();
-            onClose();
-        } catch (err) {
-            setError(err.response?.data?.message || "Review submit failed");
-        } finally {
-            setLoading(false);
-        }
-    };
-
+function SectionLabel({ title, value }) {
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-amber-400 to-orange-500 p-6 text-white">
-                    <h2 className="text-2xl font-bold">Rate Your Experience</h2>
-                    <p className="text-amber-100 mt-1">{service?.title}</p>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Overall Rating *</label>
-                        <StarRating value={rating} onChange={setRating} size="lg" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Your Review *
-                            <span className="text-xs font-normal text-gray-400 ml-2">({comment.length}/500)</span>
-                        </label>
-                        <textarea
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value.slice(0, 500))}
-                            rows={4}
-                            placeholder="Apna experience share karo..."
-                            className="w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
-                        />
-                    </div>
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 text-sm">{error}</div>
-                    )}
-                    <div className="flex gap-3">
-                        <button type="button" onClick={onClose}
-                            className="flex-1 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition">
-                            Cancel
-                        </button>
-                        <button type="submit" disabled={loading}
-                            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-semibold hover:from-amber-500 hover:to-orange-600 transition disabled:opacity-50">
-                            {loading ? "Submitting..." : "⭐ Submit Review"}
-                        </button>
-                    </div>
-                </form>
-            </div>
+        <div className="rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{title}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
         </div>
     );
 }
 
-// ─── Main ServiceDetail Page ───────────────────────────────────────────────────
 export default function ServiceDetail() {
     const { id } = useParams();
     const { user } = useAuth();
@@ -190,242 +91,383 @@ export default function ServiceDetail() {
     const [service, setService] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [booking, setBooking] = useState(false);
+    const [requesting, setRequesting] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [success, setSuccess] = useState("");
     const [error, setError] = useState("");
-    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [selectedImage, setSelectedImage] = useState("");
 
     useEffect(() => {
+        setLoading(true);
         API.get(`/services/${id}`)
-            .then((res) => setService(res.data))
+            .then((res) => {
+                setService(res.data);
+                const firstImage = res.data.images?.[0]?.url || res.data.image || "";
+                setSelectedImage(firstImage);
+            })
             .catch((err) => console.error(err))
             .finally(() => setLoading(false));
     }, [id]);
 
     useEffect(() => {
-        if (service?.provider?._id) {
-            API.get(`/reviews/user/${service.provider._id}`)
-                .then((res) => setReviews(res.data))
-                .catch(console.error);
-        }
-    }, [service]);
+        API.get(`/services/${id}/reviews`)
+            .then((res) => setReviews(res.data))
+            .catch((err) => console.error(err));
+    }, [id]);
 
-    const handleBook = async () => {
+    const ratingSummary = useMemo(() => {
+        if (!reviews.length) return null;
+        const avg = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+        return avg.toFixed(1);
+    }, [reviews]);
+
+    useEffect(() => {
+        if (!selectedImage && service) {
+            const fallbackImage = service.images?.[0]?.url || service.image || "";
+            setSelectedImage(fallbackImage);
+        }
+    }, [service, selectedImage]);
+
+    const handleRequest = async () => {
         if (!user) return navigate("/login");
-        setBooking(true);
+        if (!service || service.provider?._id === user._id) return;
+
+        setRequesting(true);
         setError("");
+        setSuccess("");
         try {
-            await API.post("/transactions/create", { serviceId: id, message });
-            setSuccess("Service booked successfully! ✅");
+            await API.post(`/services/${id}/request`, { message });
+            setSuccess("Service requested successfully. Provider ko notification bhej di gayi hai.");
             setMessage("");
         } catch (err) {
-            setError(err.response?.data?.message || "Booking failed");
+            setError(err.response?.data?.message || "Request failed");
         } finally {
-            setBooking(false);
+            setRequesting(false);
         }
     };
 
-    if (loading) return (
-        <div className="min-h-screen bg-gray-50">
-            <Navbar />
-            <div className="flex justify-center items-center h-64 text-gray-400">Loading...</div>
-        </div>
-    );
+    const handleSave = async () => {
+        if (!user) return navigate("/login");
+        if (!service || service.provider?._id === user._id) return;
 
-    if (!service) return (
-        <div className="min-h-screen bg-gray-50">
-            <Navbar />
-            <div className="flex justify-center items-center h-64 text-gray-400">Service not found.</div>
-        </div>
-    );
+        setSaving(true);
+        setError("");
+        setSuccess("");
+        try {
+            await API.post(`/services/${id}/save`);
+            setService((prev) => (prev ? { ...prev, isSaved: true } : prev));
+            setSuccess("Service saved to your collection.");
+        } catch (err) {
+            setError(err.response?.data?.message || "Could not save service");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-slate-50">
+                <Navbar />
+                <div className="flex h-80 items-center justify-center text-slate-400">Loading service details...</div>
+            </div>
+        );
+    }
+
+    if (!service) {
+        return (
+            <div className="min-h-screen bg-slate-50">
+                <Navbar />
+                <div className="flex h-80 items-center justify-center text-slate-400">Service not found.</div>
+            </div>
+        );
+    }
 
     const isOwner = user?._id === service.provider?._id;
-    const avgRating = reviews.length > 0
-        ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-        : null;
+    const availability = service.availability || { mode: "flexible", days: [], hours: [], note: "" };
+    const gallery = service.images?.filter((image) => image?.url) || [];
+    const providerRating = service.provider?.rating || 0;
+    const completedJobs = service.providerStats?.completedJobsCount || 0;
+    const similarServices = service.similarServices || [];
+    const mainImage = selectedImage || gallery[0]?.url || service.image || "";
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <PageShell>
             <Navbar />
 
-            {showReviewModal && (
-                <WriteReviewModal
-                    service={service}
-                    onClose={() => setShowReviewModal(false)}
-                    onSuccess={() => {
-                        API.get(`/reviews/user/${service.provider._id}`)
-                            .then((res) => setReviews(res.data));
-                    }}
-                />
-            )}
+            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+                <Reveal>
+                    <div className="mb-6 flex flex-wrap items-center gap-3">
+                        <span className="premium-pill capitalize">{service.category}</span>
+                        <span className="premium-pill">{service.providerStats?.reviewCount || reviews.length} reviews</span>
+                        <span className="premium-pill">{completedJobs} completed jobs</span>
+                    </div>
+                </Reveal>
 
-            <div className="max-w-4xl mx-auto px-4 py-10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                    {/* Left — Service Details */}
-                    <div className="md:col-span-2 space-y-4">
-                        <span className="bg-indigo-50 text-indigo-600 text-xs font-semibold px-3 py-1 rounded-full capitalize">
-                            {service.category}
-                        </span>
-
-                        <h1 className="text-3xl font-bold text-gray-800">{service.title}</h1>
-
-                        {/* Rating Badge */}
-                        {avgRating && (
-                            <div className="flex items-center gap-2">
-                                <StarRating value={Math.round(avgRating)} readonly size="sm" />
-                                <span className="font-semibold text-gray-700">{avgRating}</span>
-                                <span className="text-gray-400 text-sm">({reviews.length} reviews)</span>
-                            </div>
-                        )}
-
-                        <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
-                            <h2 className="font-semibold text-gray-700 mb-3">About this service</h2>
-                            <p className="text-gray-600 text-sm leading-relaxed">{service.description}</p>
-                        </div>
-
-                        {service.tags?.length > 0 && (
-                            <div className="flex gap-2 flex-wrap">
-                                {service.tags.map((tag) => (
-                                    <span key={tag} className="bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded-full">
-                                        #{tag}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Provider Info */}
-                        <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
-                            <h2 className="font-semibold text-gray-700 mb-4">About the Provider</h2>
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-indigo-600 text-white text-lg font-bold flex items-center justify-center">
-                                    {service.provider?.name?.[0]?.toUpperCase()}
+                <div className="grid gap-8 lg:grid-cols-[1.35fr_0.65fr]">
+                    <div className="space-y-6">
+                        <Reveal>
+                            <GlassCard className="overflow-hidden p-0">
+                                <div className="relative aspect-[16/9] bg-gradient-to-br from-indigo-100 via-sky-100 to-violet-100">
+                                    {mainImage ? (
+                                        <img src={mainImage} alt={service.title} className="h-full w-full object-cover" />
+                                    ) : (
+                                        <div className="flex h-full items-center justify-center text-6xl text-indigo-500">🧩</div>
+                                    )}
+                                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 to-transparent px-6 py-5 text-white">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">Service details</p>
+                                        <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">{service.title}</h1>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-bold text-gray-800">{service.provider?.name}</p>
-                                    <p className="text-sm text-gray-500">
-                                        ⭐ {service.provider?.rating || "New"} · {service.provider?.totalReviews || 0} reviews
-                                    </p>
-                                </div>
-                            </div>
-                            {service.provider?.bio && (
-                                <p className="text-sm text-gray-600 mt-3">{service.provider.bio}</p>
-                            )}
-                            {service.provider?.skills?.length > 0 && (
-                                <div className="flex gap-2 flex-wrap mt-3">
-                                    {service.provider.skills.map((skill) => (
-                                        <span key={skill} className="bg-indigo-50 text-indigo-600 text-xs px-2 py-0.5 rounded-full">
-                                            {skill}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
 
-                        {/* ⭐ Reviews Section */}
-                        <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold text-gray-800">
-                                    Reviews ({reviews.length})
-                                </h2>
-                                {user && !isOwner && (
-                                    <button
-                                        onClick={() => setShowReviewModal(true)}
-                                        className="bg-amber-400 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition"
-                                    >
-                                        ✍️ Write Review
-                                    </button>
+                                {gallery.length > 1 && (
+                                    <div className="flex gap-3 overflow-x-auto border-t border-slate-100 bg-white p-4">
+                                        {(gallery.length ? gallery : [{ url: mainImage }]).map((image, index) => (
+                                            <button
+                                                key={`${image.url}-${index}`}
+                                                type="button"
+                                                onClick={() => setSelectedImage(image.url)}
+                                                className={`h-20 w-28 shrink-0 overflow-hidden rounded-2xl border-2 transition ${selectedImage === image.url ? "border-indigo-500 shadow-glow" : "border-transparent"}`}
+                                            >
+                                                <img src={image.url} alt={`${service.title} ${index + 1}`} className="h-full w-full object-cover" />
+                                            </button>
+                                        ))}
+                                    </div>
                                 )}
-                            </div>
+                            </GlassCard>
+                        </Reveal>
 
-                            {/* Rating Summary */}
-                            <RatingSummary reviews={reviews} />
-
-                            {/* Review Cards */}
-                            {reviews.length === 0 ? (
-                                <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-                                    <div className="text-4xl mb-3">⭐</div>
-                                    <p className="text-gray-500">Abhi koi review nahi hai</p>
-                                    <p className="text-gray-400 text-sm mt-1">Pehle review dene wale bano!</p>
+                        <Reveal delay={0.05}>
+                            <GlassCard className="p-6 md:p-8">
+                                <div className="flex flex-wrap items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Full description</p>
+                                        <h2 className="mt-2 text-2xl font-bold text-slate-900">{service.title}</h2>
+                                    </div>
+                                    <div className="rounded-2xl bg-indigo-50 px-4 py-3 text-right">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-500">Credits required</p>
+                                        <p className="mt-1 text-2xl font-black text-indigo-700">{service.hoursRequired}h</p>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {reviews.map((review) => (
-                                        <ReviewCard key={review._id} review={review} />
+
+                                <p className="mt-5 text-sm leading-7 text-slate-600">{service.description}</p>
+
+                                {service.tags?.length > 0 && (
+                                    <div className="mt-6 flex flex-wrap gap-2">
+                                        {service.tags.map((tag) => (
+                                            <span key={tag} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                                #{tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </GlassCard>
+                        </Reveal>
+
+                        <Reveal delay={0.1}>
+                            <GlassCard className="p-6 md:p-8">
+                                <SectionHeading
+                                    eyebrow="Provider"
+                                    title="Provider details"
+                                    description="Everything you need to judge trust, experience, and fit before booking."
+                                />
+                                <div className="mt-6 grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-600 to-sky-500 text-xl font-black text-white shadow-lg shadow-indigo-500/25">
+                                            {service.provider?.name?.[0]?.toUpperCase() || "P"}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <h3 className="text-xl font-bold text-slate-900">{service.provider?.name}</h3>
+                                                {service.provider?.location?.address && (
+                                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                                                        {service.provider.location.address}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                                                <StarRating value={providerRating} />
+                                                <span>{providerRating ? providerRating.toFixed?.(1) || providerRating : "New"}</span>
+                                                <span>· {service.provider?.totalReviews || 0} reviews</span>
+                                                <span>· {completedJobs} completed jobs</span>
+                                            </div>
+                                            {service.provider?.bio && <p className="mt-4 text-sm leading-7 text-slate-600">{service.provider.bio}</p>}
+                                        </div>
+                                    </div>
+
+                                    {service.provider?.skills?.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 md:justify-end">
+                                            {service.provider.skills.map((skill) => (
+                                                <span key={skill} className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                                    {skill}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </GlassCard>
+                        </Reveal>
+
+                        <Reveal delay={0.15}>
+                            <GlassCard className="p-6 md:p-8">
+                                <SectionHeading
+                                    eyebrow="Availability"
+                                    title="When the provider is available"
+                                    description="A quick glance at timing and flexibility before you request the service."
+                                />
+                                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                                    <SectionLabel title="Mode" value={availability.mode || "Flexible"} />
+                                    <SectionLabel title="Days" value={availability.days?.length ? availability.days.join(", ") : "On request"} />
+                                    <SectionLabel title="Hours" value={availability.hours?.length ? availability.hours.join(", ") : "On request"} />
+                                </div>
+                                <p className="mt-4 text-sm leading-7 text-slate-600">
+                                    {availability.note || "Availability is flexible and can be confirmed after you send the request."}
+                                </p>
+                            </GlassCard>
+                        </Reveal>
+
+                        <Reveal delay={0.2}>
+                            <GlassCard className="p-6 md:p-8">
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    <SectionHeading
+                                        eyebrow="Reviews"
+                                        title={`Reviews (${reviews.length})`}
+                                        description="Real feedback from people who worked with this provider."
+                                    />
+                                    {ratingSummary && (
+                                        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-right">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-500">Average rating</p>
+                                            <p className="mt-1 text-2xl font-black text-amber-600">{ratingSummary}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-6 space-y-4">
+                                    {reviews.length === 0 ? (
+                                        <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
+                                            No reviews yet for this service.
+                                        </div>
+                                    ) : (
+                                        reviews.map((review) => <ReviewCard key={review._id} review={review} />)
+                                    )}
+                                </div>
+                            </GlassCard>
+                        </Reveal>
+
+                        {similarServices.length > 0 && (
+                            <Reveal delay={0.25}>
+                                <SectionHeading
+                                    eyebrow="Explore"
+                                    title="Similar services"
+                                    description="Other services from the marketplace that match this category or skill set."
+                                />
+                                <Stagger className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                                    {similarServices.map((item) => (
+                                        <StaggerItem key={item._id}>
+                                            <ServiceMiniCard service={item} />
+                                        </StaggerItem>
                                     ))}
-                                </div>
-                            )}
-                        </div>
+                                </Stagger>
+                            </Reveal>
+                        )}
                     </div>
 
-                    {/* Right — Booking Card */}
-                    <div className="space-y-4">
-                        <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm sticky top-20">
-                            <div className="text-center mb-6">
-                                <span className="text-4xl font-extrabold text-indigo-600">
-                                    {service.hoursRequired}
-                                </span>
-                                <span className="text-gray-500 text-sm ml-1">Time Credits</span>
-                            </div>
-
-                            {user && (
-                                <div className="bg-indigo-50 rounded-lg p-3 text-center mb-4">
-                                    <p className="text-xs text-gray-500">Your Balance</p>
-                                    <p className="text-lg font-bold text-indigo-600">
-                                        ⏱ {user.timeCredits} Credits
-                                    </p>
+                    <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+                        <Reveal>
+                            <GlassCard className="p-6 md:p-7">
+                                <div className="rounded-[1.5rem] bg-gradient-to-br from-indigo-600 via-violet-600 to-sky-500 p-6 text-white shadow-[0_24px_70px_rgba(79,70,229,0.3)]">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/75">Request now</p>
+                                    <div className="mt-3 text-4xl font-black">{service.hoursRequired}h</div>
+                                    <p className="mt-1 text-sm text-white/80">Time credits required</p>
                                 </div>
-                            )}
 
-                            {success && (
-                                <div className="bg-green-50 border border-green-200 text-green-600 px-3 py-2 rounded-lg text-sm mb-3">
-                                    {success}
+                                {user && !isOwner && (
+                                    <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-center">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Your balance</p>
+                                        <p className="mt-1 text-lg font-black text-slate-900">⏱ {user.timeCredits} Credits</p>
+                                    </div>
+                                )}
+
+                                {success && (
+                                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                                        {success}
+                                    </div>
+                                )}
+                                {error && (
+                                    <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                        {error}
+                                    </div>
+                                )}
+
+                                <div className="mt-5 space-y-3">
+                                    {!isOwner && user ? (
+                                        <>
+                                            <textarea
+                                                placeholder="Message to provider (optional)"
+                                                value={message}
+                                                onChange={(e) => setMessage(e.target.value)}
+                                                rows={4}
+                                                className="premium-input min-h-[120px]"
+                                            />
+                                            <button
+                                                onClick={handleRequest}
+                                                disabled={requesting}
+                                                className="premium-button w-full justify-center px-5 py-3 text-sm"
+                                            >
+                                                {requesting ? "Requesting..." : "Request Service"}
+                                            </button>
+                                            <button
+                                                onClick={() => navigate("/chat", { state: { userId: service.provider?._id } })}
+                                                className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"
+                                            >
+                                                Chat with Provider
+                                            </button>
+                                            <button
+                                                onClick={handleSave}
+                                                disabled={saving || service.isSaved}
+                                                className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"
+                                            >
+                                                {saving ? "Saving..." : service.isSaved ? "Saved Service" : "Save Service"}
+                                            </button>
+                                        </>
+                                    ) : isOwner ? (
+                                        <div className="rounded-2xl bg-slate-50 px-4 py-4 text-center text-sm text-slate-500">
+                                            This is your service listing.
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => navigate("/login")}
+                                                className="premium-button w-full justify-center px-5 py-3 text-sm"
+                                            >
+                                                Login to Request
+                                            </button>
+                                            <button
+                                                onClick={() => navigate("/login")}
+                                                className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"
+                                            >
+                                                Login to Save
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
-                            )}
-                            {error && (
-                                <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm mb-3">
-                                    {error}
+                            </GlassCard>
+                        </Reveal>
+
+                        <Reveal delay={0.05}>
+                            <GlassCard className="p-6">
+                                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Quick facts</p>
+                                <div className="mt-4 grid gap-3">
+                                    <SectionLabel title="Category" value={service.category} />
+                                    <SectionLabel title="Credits" value={`${service.hoursRequired} hours`} />
+                                    <SectionLabel title="Reviews" value={reviews.length.toString()} />
+                                    <SectionLabel title="Bookings" value={completedJobs.toString()} />
                                 </div>
-                            )}
-
-                            {!isOwner && !success && user && (
-                                <>
-                                    <textarea
-                                        placeholder="Message to provider (optional)"
-                                        value={message}
-                                        onChange={(e) => setMessage(e.target.value)}
-                                        rows={3}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 resize-none mb-3"
-                                    />
-                                    <button
-                                        onClick={handleBook}
-                                        disabled={booking}
-                                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition"
-                                    >
-                                        {booking ? "Booking..." : "Book Service ⏱"}
-                                    </button>
-                                </>
-                            )}
-
-                            {isOwner && (
-                                <div className="text-center text-sm text-gray-400">
-                                    This is your service
-                                </div>
-                            )}
-
-                            {!user && (
-                                <button
-                                    onClick={() => navigate("/login")}
-                                    className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition"
-                                >
-                                    Login to Book
-                                </button>
-                            )}
-                        </div>
+                            </GlassCard>
+                        </Reveal>
                     </div>
                 </div>
             </div>
-        </div>
+        </PageShell>
     );
 }

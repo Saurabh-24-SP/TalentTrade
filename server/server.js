@@ -53,6 +53,7 @@ app.use("/api/admin", require("./routes/admin"));
 app.use("/api/ai", require("./routes/ai"));
 app.use("/api/upload", require("./routes/uploadRoutes"));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use("/api/dashboard", require("./routes/dashboard"));
 
 // Health check
 app.get("/", (req, res) => res.send("TalentTradeServer Running ✅"));

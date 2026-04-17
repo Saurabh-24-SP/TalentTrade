@@ -22,6 +22,12 @@ const serviceSchema = new mongoose.Schema(
             lng: { type: Number, default: 0 },
         },
         image: { type: String, default: "" },
+        availability: {
+            mode: { type: String, default: "flexible" },
+            days: [{ type: String }],
+            hours: [{ type: String }],
+            note: { type: String, default: "" },
+        },
         status: { type: String, enum: ["active", "inactive"], default: "active" },
         totalBookings: { type: Number, default: 0 },
         images: [{

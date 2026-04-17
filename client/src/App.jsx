@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useState, useEffect } from "react";
 import Home from "./pages/Home";
@@ -14,10 +14,12 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Chat from "./pages/Chat";
 import AIRecommendations from "./pages/AIRecommendations";
 import MyServices from "./pages/MyServices";
+import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import AIChatbot from "./components/AIChatbot";
 import SearchPage from './pages/SearchPage';
 import MapView from './components/MapView';
+import { AnimatePresence, motion } from "framer-motion";
 
 // ─── PWA Install Banner ────────────────────────────────────────────────────────
 function InstallBanner() {
@@ -49,21 +51,26 @@ function InstallBanner() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-indigo-600 text-white shadow-2xl">
-      <div className="max-w-md mx-auto flex items-center gap-4">
-        <span className="text-3xl">⏱️</span>
-        <div className="flex-1">
-          <p className="font-semibold text-sm">Install TalentTradeAI</p>
-          <p className="text-indigo-200 text-xs">App ki tarah use karo — offline bhi!</p>
+    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-md">
+      <div className="glass-card border border-indigo-100/70 bg-white/90 p-4 shadow-soft">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-sky-500 text-2xl text-white shadow-lg shadow-indigo-500/25">
+            ✨
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-900">Install TalentTrade AI</p>
+            <p className="text-xs text-slate-500">A smoother, app-like experience with offline support.</p>
+          </div>
+          <button
+            onClick={handleInstall}
+            className="premium-button px-4 py-2 text-xs"
+          >
+            Install
+          </button>
+          <button onClick={handleDismiss} className="text-slate-400 transition hover:text-slate-700">
+            ×
+          </button>
         </div>
-        <button onClick={handleInstall}
-          className="bg-white text-indigo-700 font-semibold text-sm px-4 py-2 rounded-xl hover:bg-indigo-50 transition flex-shrink-0">
-          Install
-        </button>
-        <button onClick={handleDismiss}
-          className="text-indigo-200 hover:text-white text-xl flex-shrink-0">
-          ×
-        </button>
       </div>
     </div>
   );
@@ -87,9 +94,11 @@ function OfflineBanner() {
   if (isOnline) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-gray-800 text-white text-sm text-center py-2 flex items-center justify-center gap-2">
-      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-      Aap offline hain — kuch features kaam nahi karenge
+    <div className="fixed left-1/2 top-4 z-50 w-[calc(100%-2rem)] -translate-x-1/2 md:w-auto">
+      <div className="glass-card flex items-center gap-2 rounded-full border border-rose-200 bg-white/90 px-4 py-2 text-sm text-slate-700 shadow-soft">
+        <span className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_0_6px_rgba(244,63,94,0.14)]"></span>
+        You are offline - some features may not work
+      </div>
     </div>
   );
 }
@@ -111,6 +120,50 @@ const AdminRoute = ({ children }) => {
   return user?.role === "admin" ? children : <Navigate to="/" />;
 };
 
+const PageTransition = ({ children }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 16 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -16 }}
+    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+    className="min-h-screen"
+  >
+    {children}
+  </motion.div>
+);
+
+function AnimatedAppRoutes() {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={<PageTransition><Home /></PageTransition>} />
+        <Route path="/login" element={user ? <Navigate to="/" /> : <PageTransition><Login /></PageTransition>} />
+        <Route path="/register" element={user ? <Navigate to="/" /> : <PageTransition><Register /></PageTransition>} />
+        <Route path="/services" element={<PageTransition><BrowseServices /></PageTransition>} />
+        <Route path="/services/:id" element={<PageTransition><ServiceDetail /></PageTransition>} />
+        <Route path="/search" element={<PageTransition><SearchPage /></PageTransition>} />
+        <Route path="/map" element={<PageTransition><MapView /></PageTransition>} />
+
+        <Route path="/post-service" element={<ProtectedRoute><PageTransition><PostService /></PageTransition></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><PageTransition><Dashboard /></PageTransition></ProtectedRoute>} />
+        <Route path="/my-services" element={<ProtectedRoute><PageTransition><MyServices /></PageTransition></ProtectedRoute>} />
+        <Route path="/transactions" element={<ProtectedRoute><PageTransition><MyTransactions /></PageTransition></ProtectedRoute>} />
+        <Route path="/credits" element={<ProtectedRoute><PageTransition><CreditDashboard /></PageTransition></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><PageTransition><Profile /></PageTransition></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><PageTransition><Chat /></PageTransition></ProtectedRoute>} />
+        <Route path="/ai" element={<ProtectedRoute><PageTransition><AIRecommendations /></PageTransition></ProtectedRoute>} />
+
+        <Route path="/admin" element={<AdminRoute><PageTransition><AdminDashboard /></PageTransition></AdminRoute>} />
+
+        <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+      </Routes>
+    </AnimatePresence>
+  );
+}
+
 // ─── Main App ──────────────────────────────────────────────────────────────────
 function App() {
   const { user } = useAuth();
@@ -121,31 +174,7 @@ function App() {
       <OfflineBanner />
       <InstallBanner />
 
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
-        <Route path="/services" element={<BrowseServices />} />
-        <Route path="/services/:id" element={<ServiceDetail />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/map" element={<MapView />} />
-
-        {/* Protected Routes */}
-        <Route path="/post-service" element={<ProtectedRoute><PostService /></ProtectedRoute>} />
-        <Route path="/my-services" element={<ProtectedRoute><MyServices /></ProtectedRoute>} />
-        <Route path="/transactions" element={<ProtectedRoute><MyTransactions /></ProtectedRoute>} />
-        <Route path="/credits" element={<ProtectedRoute><CreditDashboard /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-        <Route path="/ai" element={<ProtectedRoute><AIRecommendations /></ProtectedRoute>} />
-
-        {/* Admin Route */}
-        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-
-        {/* 404 */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <AnimatedAppRoutes />
 
       {/* AI Chatbot */}
       {user && <AIChatbot />}

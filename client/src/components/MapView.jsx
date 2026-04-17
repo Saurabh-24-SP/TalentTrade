@@ -12,7 +12,7 @@ export default function MapView({ services = [], userLocation = null, height = '
     useEffect(() => {
         const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
         if (!apiKey) {
-            setError('Google Maps API key nahi hai. VITE_GOOGLE_MAPS_API_KEY add karo .env mein');
+            setError('Google Maps API key is missing. Add VITE_GOOGLE_MAPS_API_KEY to .env');
             return;
         }
         if (window.google?.maps) { setMapLoaded(true); return; }
@@ -20,11 +20,11 @@ export default function MapView({ services = [], userLocation = null, height = '
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
         script.async = true;
         script.onload = () => setMapLoaded(true);
-        script.onerror = () => setError('Google Maps load nahi hua');
+        script.onerror = () => setError('Google Maps failed to load');
         document.head.appendChild(script);
     }, []);
 
-    // Map initialize karo
+    // Initialize the map
     useEffect(() => {
         if (!mapLoaded || !mapRef.current || mapInstanceRef.current) return;
         const center = userLocation
@@ -60,7 +60,7 @@ export default function MapView({ services = [], userLocation = null, height = '
         mapInstanceRef.current.setCenter({ lat: userLocation.lat, lng: userLocation.lng });
     }, [userLocation, mapLoaded]);
 
-    // Service markers add karo
+    // Add service markers
     useEffect(() => {
         if (!mapInstanceRef.current || !mapLoaded) return;
 
@@ -112,7 +112,7 @@ export default function MapView({ services = [], userLocation = null, height = '
             markersRef.current.push(marker);
         });
 
-        // Map ko fit karo
+        // Fit the map
         if (markersRef.current.length > 0) {
             const bounds = new window.google.maps.LatLngBounds();
             markersRef.current.forEach((m) => bounds.extend(m.getPosition()));
@@ -135,7 +135,7 @@ export default function MapView({ services = [], userLocation = null, height = '
             <div className="flex items-center justify-center bg-gray-100 rounded-2xl animate-pulse" style={{ height }}>
                 <div className="text-center">
                     <p className="text-4xl mb-3">🗺️</p>
-                    <p className="text-gray-500">Map load ho raha hai...</p>
+                    <p className="text-gray-500">Loading map...</p>
                 </div>
             </div>
         );

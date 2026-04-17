@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-// ✅ Password hash — next() bilkul nahi use karo
+// ✅ Password hash — do not use next()
 userSchema.pre("save", async function () {
     if (!this.isModified("password")) return;
     const salt = await bcrypt.genSalt(10);

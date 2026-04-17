@@ -38,7 +38,7 @@ const uploadProfile = multer({
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) cb(null, true);
-        else cb(new Error('Sirf image files allowed hain'), false);
+        else cb(new Error('Only image files are allowed'), false);
     },
 }).single('avatar');
 
@@ -47,7 +47,7 @@ const uploadServiceImages = multer({
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) cb(null, true);
-        else cb(new Error('Sirf image files allowed hain'), false);
+        else cb(new Error('Only image files are allowed'), false);
     },
 }).array('images', 5); // max 5 images
 
@@ -56,11 +56,11 @@ const uploadChatImage = multer({
     limits: { fileSize: 8 * 1024 * 1024 }, // 8MB
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) cb(null, true);
-        else cb(new Error('Sirf image files allowed hain'), false);
+        else cb(new Error('Only image files are allowed'), false);
     },
 }).single('image');
 
-// Image delete karo Cloudinary se
+// Delete image from Cloudinary
 const deleteImage = async (publicId) => {
     try {
         const result = await cloudinary.uploader.destroy(publicId);

@@ -10,7 +10,7 @@ const {
 const User = require('../models/User');
 const Service = require('../models/Service');
 
-// Cloudinary se sahi URL nikalo
+// Extract correct URL from Cloudinary
 const getFileUrl = (file) => {
     return file.secure_url || file.url || file.path || '';
 };
@@ -26,7 +26,7 @@ router.post('/avatar', protect, (req, res) => {
             return res.status(400).json({ success: false, message: err.message });
         }
         if (!req.file) {
-            return res.status(400).json({ success: false, message: 'Koi file upload nahi hui' });
+            return res.status(400).json({ success: false, message: 'No file was uploaded' });
         }
         try {
             console.log('req.file:', JSON.stringify(req.file, null, 2));
@@ -39,7 +39,7 @@ router.post('/avatar', protect, (req, res) => {
 
             const user = await User.findById(req.user._id);
 
-            // Purani avatar delete karo
+            // Delete old avatar
             if (user.avatarPublicId) {
                 await deleteImage(user.avatarPublicId).catch(console.error);
             }
@@ -51,7 +51,7 @@ router.post('/avatar', protect, (req, res) => {
             res.json({
                 success: true,
                 avatar: avatarUrl,
-                message: 'Profile picture update ho gaya ✅',
+                message: 'Profile picture updated ✅',
             });
         } catch (error) {
             console.error('Avatar save error:', error);
@@ -67,15 +67,15 @@ router.post('/service/:serviceId', protect, (req, res) => {
             return res.status(400).json({ success: false, message: err.message });
         }
         if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ success: false, message: 'Koi file upload nahi hui' });
+            return res.status(400).json({ success: false, message: 'No file was uploaded' });
         }
         try {
             const service = await Service.findById(req.params.serviceId);
             if (!service) {
-                return res.status(404).json({ success: false, message: 'Service nahi mili' });
+                return res.status(404).json({ success: false, message: 'Service not found' });
             }
             if (service.provider.toString() !== req.user._id.toString()) {
-                return res.status(403).json({ success: false, message: 'Aap authorized nahi hain' });
+                return res.status(403).json({ success: false, message: 'You are not authorized' });
             }
 
             const newImages = req.files.map((file) => ({
@@ -89,7 +89,7 @@ router.post('/service/:serviceId', protect, (req, res) => {
             res.json({
                 success: true,
                 images: service.images,
-                message: `${req.files.length} image(s) upload ho gayi ✅`,
+                message: `${req.files.length} image(s) uploaded ✅`,
             });
         } catch (error) {
             res.status(500).json({ success: false, message: error.message });
@@ -104,17 +104,17 @@ router.delete('/service/:serviceId/image', protect, async (req, res) => {
         const service = await Service.findById(req.params.serviceId);
 
         if (!service) {
-            return res.status(404).json({ success: false, message: 'Service nahi mili' });
+            return res.status(404).json({ success: false, message: 'Service not found' });
         }
         if (service.provider.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ success: false, message: 'Aap authorized nahi hain' });
+            return res.status(403).json({ success: false, message: 'You are not authorized' });
         }
 
         await deleteImage(publicId);
         service.images = service.images.filter((img) => img.publicId !== publicId);
         await service.save();
 
-        res.json({ success: true, images: service.images, message: 'Image delete ho gayi ✅' });
+        res.json({ success: true, images: service.images, message: 'Image deleted ✅' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -127,13 +127,13 @@ router.post('/chat', protect, (req, res) => {
             return res.status(400).json({ success: false, message: err.message });
         }
         if (!req.file) {
-            return res.status(400).json({ success: false, message: 'Koi file upload nahi hui' });
+            return res.status(400).json({ success: false, message: 'No file was uploaded' });
         }
         res.json({
             success: true,
             url: getFileUrl(req.file),
             publicId: getPublicId(req.file),
-            message: 'Image upload ho gayi ✅',
+            message: 'Image uploaded ✅',
         });
     });
 });

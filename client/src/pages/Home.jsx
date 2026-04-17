@@ -3,97 +3,80 @@ import { useAuth } from "../context/AuthContext";
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import API from "../utils/api";
+import {
+    AnimatedCounter,
+    AnimatedTypingText,
+    GlassCard,
+    PageShell,
+    PremiumButton,
+    Reveal,
+    SectionHeading,
+    Stagger,
+    StaggerItem,
+} from "../components/PremiumMotion";
 
 const features = [
-    { icon: "⏱", title: "Time Credits", desc: "Earn credits by offering services. Spend them to get help." },
-    { icon: "🤖", title: "AI Matching", desc: "Our AI finds the best service providers for your needs." },
-    { icon: "🛡️", title: "Fraud Protection", desc: "AI monitors every transaction to keep you safe." },
-    { icon: "💬", title: "Real-time Chat", desc: "Chat directly with service providers instantly." },
+    { icon: "⏱", title: "Time Credits", desc: "Earn credits by offering services and spend them with confidence." },
+    { icon: "🤖", title: "AI Matching", desc: "Smart recommendations surface the right people at the right time." },
+    { icon: "🛡️", title: "Trust Layer", desc: "Ratings, moderation, and alerts keep every exchange safer." },
+    { icon: "💬", title: "Instant Chat", desc: "Move from discovery to conversation without friction." },
 ];
 
-// ─── Animated Counter ──────────────────────────────────────────────────────────
-function AnimatedCounter({ target, suffix = "" }) {
-    const [count, setCount] = useState(0);
-
-    useEffect(() => {
-        if (!target) return;
-        let start = 0;
-        const duration = 1500;
-        const increment = target / (duration / 16);
-        const timer = setInterval(() => {
-            start += increment;
-            if (start >= target) {
-                setCount(target);
-                clearInterval(timer);
-            } else {
-                setCount(Math.floor(start));
-            }
-        }, 16);
-        return () => clearInterval(timer);
-    }, [target]);
-
-    return <span>{count.toLocaleString()}{suffix}</span>;
+function StatCard({ label, value, suffix = "", accent = "text-indigo-600" }) {
+    return (
+        <GlassCard className="p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+            <div className={`mt-3 text-3xl font-extrabold ${accent}`}>
+                <AnimatedCounter end={value} suffix={suffix} />
+            </div>
+        </GlassCard>
+    );
 }
 
 export default function Home() {
     const { user } = useAuth();
-    const [stats, setStats] = useState({
-        users: 0,
-        services: 0,
-        hoursExchanged: 0,
-        avgRating: 0,
-    });
+    const [stats, setStats] = useState({ users: 0, services: 0, hoursExchanged: 0, avgRating: 0 });
     const [statsLoading, setStatsLoading] = useState(true);
 
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                // Parallel mein sab fetch karo
-                const [usersRes, servicesRes, transactionsRes] = await Promise.allSettled([
-                    API.get('/auth/stats').catch(() => null),
-                    API.get('/services/stats').catch(() => null),
-                    API.get('/transactions/stats').catch(() => null),
-                ]);
-
-                // Fallback — agar dedicated stats route nahi hai toh
-                const [usersData, servicesData, transData] = await Promise.allSettled([
-                    API.get('/admin/stats').catch(() => null),
-                ]);
-
-                const adminStats = usersData?.value?.data;
+                const adminStatsRes = await API.get("/admin/stats").catch(() => null);
+                const adminStats = adminStatsRes?.data;
 
                 if (adminStats) {
                     setStats({
                         users: adminStats.totalUsers || 0,
                         services: adminStats.totalServices || 0,
                         hoursExchanged: adminStats.totalTransactions || 0,
-                        avgRating: adminStats.avgRating || 0,
+                        avgRating: adminStats.avgRating || 4.9,
                     });
                 } else {
-                    // Individual endpoints try karo
-                    try {
-                        const [u, s, t] = await Promise.all([
-                            API.get('/admin/users').catch(() => ({ data: [] })),
-                            API.get('/services').catch(() => ({ data: [] })),
-                            API.get('/admin/transactions').catch(() => ({ data: [] })),
-                        ]);
+                    const [usersRes, servicesRes, transactionsRes] = await Promise.all([
+                        API.get("/admin/users").catch(() => ({ data: [] })),
+                        API.get("/services/all").catch(() => ({ data: { services: [] } })),
+                        API.get("/admin/transactions").catch(() => ({ data: [] })),
+                    ]);
 
-                        const users = Array.isArray(u.data) ? u.data.length : (u.data?.users?.length || 0);
-                        const services = Array.isArray(s.data) ? s.data.length : (s.data?.services?.length || 0);
-                        const transactions = Array.isArray(t.data) ? t.data.length : (t.data?.transactions?.length || 0);
+                    const users = Array.isArray(usersRes.data) ? usersRes.data.length : usersRes.data?.users?.length || 0;
+                    const services = Array.isArray(servicesRes.data?.services)
+                        ? servicesRes.data.services.length
+                        : Array.isArray(servicesRes.data)
+                            ? servicesRes.data.length
+                            : 0;
+                    const transactions = Array.isArray(transactionsRes.data)
+                        ? transactionsRes.data.length
+                        : transactionsRes.data?.transactions?.length || 0;
 
-                        setStats({
-                            users,
-                            services,
-                            hoursExchanged: transactions,
-                            avgRating: 4.9,
-                        });
-                    } catch (e) {
-                        console.error('Stats fetch failed:', e);
-                    }
+                    setStats({
+                        users,
+                        services,
+                        hoursExchanged: transactions,
+                        avgRating: 4.9,
+                    });
                 }
             } catch (error) {
-                console.error('Stats error:', error);
+                console.error("Stats error:", error);
             } finally {
                 setStatsLoading(false);
             }
@@ -102,123 +85,187 @@ export default function Home() {
         fetchStats();
     }, []);
 
+    const statsCards = [
+        { label: "Active users", value: stats.users, suffix: "+" },
+        { label: "Services listed", value: stats.services, suffix: "+" },
+        { label: "Hours exchanged", value: stats.hoursExchanged, suffix: "+" },
+        { label: "Average rating", value: Number(stats.avgRating || 4.9), suffix: "★", accent: "text-amber-500" },
+    ];
+
     return (
-        <div className="min-h-screen bg-gray-50">
+        <PageShell>
             <Navbar />
 
-            {/* Hero Section */}
-            <section className="bg-indigo-600 text-white py-20 px-4 text-center">
-                <div className="max-w-3xl mx-auto">
-                    <span className="bg-indigo-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
-                        🤖 Powered by Groq AI
-                    </span>
-                    <h1 className="text-5xl font-extrabold mt-4 mb-4 leading-tight">
-                        Exchange Skills,<br />Not Money
-                    </h1>
-                    <p className="text-indigo-200 text-lg mb-8">
-                        Trade your time and skills instead of money.
-                        Help someone, earn credits, get help back.
-                    </p>
-                    <div className="flex gap-3 justify-center flex-wrap">
-                        {user ? (
-                            <Link to="/services" className="bg-white text-indigo-600 px-6 py-3 rounded-lg font-bold hover:bg-indigo-50 transition">
-                                Browse Services →
-                            </Link>
-                        ) : (
-                            <>
-                                <Link to="/register" className="bg-white text-indigo-600 px-6 py-3 rounded-lg font-bold hover:bg-indigo-50 transition">
-                                    Get Started Free
-                                </Link>
-                                <Link to="/services" className="border-2 border-white text-white px-6 py-3 rounded-lg font-bold hover:bg-indigo-500 transition">
-                                    Browse Services
-                                </Link>
-                            </>
-                        )}
-                    </div>
-                    <p className="text-indigo-300 text-sm mt-4">
-                        🎁 New users get 10 free Time Credits!
-                    </p>
-                </div>
-            </section>
+            <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+                <Reveal>
+                    <section className="hero-panel px-6 py-10 sm:px-10 lg:px-14 lg:py-14">
+                        <div className="hero-glow hero-glow-one" />
+                        <div className="hero-glow hero-glow-two" />
+                        <div className="relative grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+                            <div className="relative z-10 max-w-2xl">
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <span className="premium-pill">Powered by Groq AI</span>
+                                    <span className="premium-pill">Trusted skill exchange</span>
+                                </div>
+                                <h1 className="mt-6 text-5xl font-black leading-[1.02] tracking-tight text-white md:text-6xl lg:text-7xl">
+                                    <span className="text-gradient">Exchange Skills</span>,
+                                    <br />
+                                    not money.
+                                </h1>
+                                <p className="mt-5 max-w-xl text-base leading-7 text-white/80 md:text-lg">
+                                    Trade your time, grow your network, and unlock help from people with real expertise.
+                                </p>
+                                <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-white/85">
+                                    <span className="premium-pill">Learn faster</span>
+                                    <span className="premium-pill">Earn credits</span>
+                                    <span className="premium-pill">Connect with skilled people</span>
+                                </div>
 
-            {/* ✅ Real-time Stats */}
-            <section className="bg-white py-8 border-b border-gray-100">
-                <div className="max-w-4xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                    {statsLoading ? (
-                        // Loading skeleton
-                        [...Array(4)].map((_, i) => (
-                            <div key={i} className="animate-pulse">
-                                <div className="h-8 bg-gray-200 rounded w-20 mx-auto mb-2"></div>
-                                <div className="h-4 bg-gray-100 rounded w-24 mx-auto"></div>
+                                <div className="mt-8 flex flex-wrap gap-3">
+                                    {user ? (
+                                        <>
+                                            <Link to="/dashboard" className="premium-button px-6 py-3 text-sm">
+                                                Open dashboard
+                                            </Link>
+                                            <Link to="/services" className="premium-button premium-button-ghost px-6 py-3 text-sm">
+                                                Browse services
+                                            </Link>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Link to="/register" className="premium-button px-6 py-3 text-sm">
+                                                Get started free
+                                            </Link>
+                                            <Link to="/services" className="premium-button premium-button-ghost px-6 py-3 text-sm">
+                                                Browse services
+                                            </Link>
+                                        </>
+                                    )}
+                                </div>
+
+                                <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                                    {[
+                                        "4.9/5 average rating",
+                                        "10 free credits on signup",
+                                        "AI matched discovery",
+                                    ].map((item) => (
+                                        <div key={item} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white/90 backdrop-blur-md">
+                                            {item}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
+
+                            <div className="relative z-10">
+                                <GlassCard className="overflow-hidden p-0">
+                                    <div className="border-b border-slate-100 px-6 py-5">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Live preview</p>
+                                        <h2 className="mt-2 text-2xl font-bold text-slate-900">TalentTrade dashboard</h2>
+                                        <p className="mt-2 text-sm text-slate-500">A premium exchange experience designed for momentum.</p>
+                                    </div>
+                                    <div className="space-y-4 p-6">
+                                        <div className="rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-sky-500 p-5 text-white shadow-glow">
+                                            <p className="text-sm/6 text-white/75">Next recommendation</p>
+                                            <div className="mt-2 text-2xl font-bold">
+                                                <AnimatedTypingText
+                                                    sequences={[
+                                                        "Design a landing page.",
+                                                        1800,
+                                                        "Learn React in a week.",
+                                                        1800,
+                                                        "Book a mentor today.",
+                                                        1800,
+                                                    ]}
+                                                    className="text-gradient text-2xl font-bold"
+                                                />
+                                            </div>
+                                            <p className="mt-3 max-w-sm text-sm text-white/80">
+                                                Premium AI recommendations surface the best fit, faster.
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {[
+                                                ["Trust score", "98%"],
+                                                ["Avg response", "< 5m"],
+                                                ["Bookings", "1.2k"],
+                                                ["Repeat rate", "74%"],
+                                            ].map(([label, value]) => (
+                                                <div key={label} className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+                                                    <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </GlassCard>
+                            </div>
+                        </div>
+                    </section>
+                </Reveal>
+
+                <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {statsLoading ? (
+                        Array.from({ length: 4 }).map((_, index) => (
+                            <div key={index} className="skeleton-card shimmer h-32 rounded-3xl" />
                         ))
                     ) : (
-                        <>
-                            <div>
-                                <div className="text-2xl font-extrabold text-indigo-600">
-                                    <AnimatedCounter target={stats.users} suffix="+" />
-                                </div>
-                                <div className="text-sm text-gray-500">Active Users</div>
-                            </div>
-                            <div>
-                                <div className="text-2xl font-extrabold text-indigo-600">
-                                    <AnimatedCounter target={stats.services} suffix="+" />
-                                </div>
-                                <div className="text-sm text-gray-500">Services Listed</div>
-                            </div>
-                            <div>
-                                <div className="text-2xl font-extrabold text-indigo-600">
-                                    <AnimatedCounter target={stats.hoursExchanged} suffix="+" />
-                                </div>
-                                <div className="text-sm text-gray-500">Hours Exchanged</div>
-                            </div>
-                            <div>
-                                <div className="text-2xl font-extrabold text-indigo-600">
-                                    {stats.avgRating > 0
-                                        ? `${parseFloat(stats.avgRating).toFixed(1)}★`
-                                        : '4.9★'
-                                    }
-                                </div>
-                                <div className="text-sm text-gray-500">Avg. Rating</div>
-                            </div>
-                        </>
+                        statsCards.map((card) => <StatCard key={card.label} {...card} />)
                     )}
-                </div>
-            </section>
-
-            {/* Features */}
-            <section className="py-16 px-4">
-                <div className="max-w-5xl mx-auto">
-                    <h2 className="text-3xl font-bold text-center text-gray-800 mb-10">
-                        Why TalentTrade?
-                    </h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        {features.map(({ icon, title, desc }) => (
-                            <div key={title} className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm text-center">
-                                <div className="text-3xl mb-3">{icon}</div>
-                                <h3 className="font-bold text-gray-800 mb-2">{title}</h3>
-                                <p className="text-gray-500 text-sm">{desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* CTA */}
-            {!user && (
-                <section className="bg-indigo-600 text-white py-16 px-4 text-center">
-                    <h2 className="text-3xl font-bold mb-3">Ready to Join?</h2>
-                    <p className="text-indigo-200 mb-6">Start exchanging skills today. It is completely free!</p>
-                    <Link to="/register" className="bg-white text-indigo-600 px-8 py-3 rounded-lg font-bold hover:bg-indigo-50 transition">
-                        Create Free Account →
-                    </Link>
                 </section>
-            )}
 
-            {/* Footer */}
-            <footer className="bg-gray-900 text-gray-400 text-center py-6 text-sm">
-                © 2025 TalentTrade AI — Built with ❤️ by Saurabh
-            </footer>
-        </div>
+                <Reveal delay={0.05}>
+                    <section className="mt-16">
+                        <SectionHeading
+                            eyebrow="Why TalentTrade"
+                            title="A startup-level experience for trading skills"
+                            description="Every interaction is designed to feel polished, fast, and trustworthy - from discovery to booking to follow-up."
+                        />
+                        <Stagger className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                            {features.map((feature) => (
+                                <StaggerItem key={feature.title}>
+                                    <GlassCard className="group h-full p-6 transition duration-300 hover:-translate-y-2 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
+                                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-sky-500 text-2xl text-white shadow-lg shadow-indigo-500/25 transition duration-300 group-hover:scale-105">
+                                            {feature.icon}
+                                        </div>
+                                        <h3 className="mt-5 text-xl font-bold text-slate-900">{feature.title}</h3>
+                                        <p className="mt-3 text-sm leading-6 text-slate-500">{feature.desc}</p>
+                                    </GlassCard>
+                                </StaggerItem>
+                            ))}
+                        </Stagger>
+                    </section>
+                </Reveal>
+
+                {!user && (
+                    <Reveal delay={0.08}>
+                        <section className="mt-16 overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/75 p-8 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:p-10">
+                            <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+                                <div>
+                                    <p className="section-eyebrow">Get started</p>
+                                    <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
+                                        Ready to join the premium skill exchange?
+                                    </h2>
+                                    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 md:text-base">
+                                        Start exchanging skills today. New users receive 10 free credits, and the platform is built to make the first booking feel effortless.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-3">
+                                    <Link to="/register" className="premium-button px-6 py-3 text-sm">
+                                        Create account
+                                    </Link>
+                                    <Link to="/services" className="premium-button premium-button-ghost px-6 py-3 text-sm">
+                                        Explore services
+                                    </Link>
+                                </div>
+                            </div>
+                        </section>
+                    </Reveal>
+                )}
+
+                <footer className="mt-16 border-t border-slate-200/70 pt-6 text-center text-sm text-slate-500">
+                    © 2025 TalentTrade AI - Built with precision and care.
+                </footer>
+            </main>
+        </PageShell>
     );
 }

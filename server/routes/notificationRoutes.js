@@ -3,7 +3,7 @@ const router = express.Router();
 const Notification = require('../models/Notification');
 const { protect } = require('../middleware/authMiddleware');
 
-// GET /api/notifications — sabhi notifications
+// GET /api/notifications — all notifications
 router.get('/', protect, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -47,7 +47,7 @@ router.get('/unread-count', protect, async (req, res) => {
     }
 });
 
-// PUT /api/notifications/:id/read — ek read karo
+// PUT /api/notifications/:id/read — mark one as read
 router.put('/:id/read', protect, async (req, res) => {
     try {
         const notification = await Notification.findOneAndUpdate(
@@ -56,7 +56,7 @@ router.put('/:id/read', protect, async (req, res) => {
             { new: true }
         );
         if (!notification) {
-            return res.status(404).json({ success: false, message: 'Notification nahi mili' });
+            return res.status(404).json({ success: false, message: 'Notification not found' });
         }
         res.json({ success: true, notification });
     } catch (error) {
@@ -64,14 +64,14 @@ router.put('/:id/read', protect, async (req, res) => {
     }
 });
 
-// PUT /api/notifications/read-all — sabhi read karo
+// PUT /api/notifications/read-all — mark all as read
 router.put('/read-all', protect, async (req, res) => {
     try {
         await Notification.updateMany(
             { recipient: req.user._id, read: false },
             { read: true, readAt: new Date() }
         );
-        res.json({ success: true, message: 'Sabhi notifications read ho gayi ✅' });
+        res.json({ success: true, message: 'All notifications marked as read ✅' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -84,7 +84,7 @@ router.delete('/:id', protect, async (req, res) => {
             _id: req.params.id,
             recipient: req.user._id,
         });
-        res.json({ success: true, message: 'Notification delete ho gayi ✅' });
+        res.json({ success: true, message: 'Notification deleted ✅' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -94,7 +94,7 @@ router.delete('/:id', protect, async (req, res) => {
 router.delete('/clear-all', protect, async (req, res) => {
     try {
         await Notification.deleteMany({ recipient: req.user._id });
-        res.json({ success: true, message: 'Sabhi notifications clear ho gayi ✅' });
+        res.json({ success: true, message: 'All notifications cleared ✅' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

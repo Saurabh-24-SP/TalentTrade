@@ -3,7 +3,7 @@ const router = express.Router();
 const { Message } = require("../models/Others");
 const { protect } = require("../middleware/authMiddleware");
 
-// ✅ MESSAGES DEKHO
+// ✅ VIEW MESSAGES
 // GET /api/messages/:userId
 router.get("/:userId", protect, async (req, res) => {
     try {
@@ -21,14 +21,14 @@ router.get("/:userId", protect, async (req, res) => {
     }
 });
 
-// ✅ MESSAGE BHEJO
+// ✅ SEND MESSAGE
 // POST /api/messages/send
 router.post("/send", protect, async (req, res) => {
     try {
         const { receiverId, text } = req.body;
 
         if (!receiverId || !text) {
-            return res.status(400).json({ message: "ReceiverId aur text required hai" });
+            return res.status(400).json({ message: "ReceiverId and text are required" });
         }
 
         const message = await Message.create({
@@ -44,7 +44,7 @@ router.post("/send", protect, async (req, res) => {
     }
 });
 
-// ✅ MESSAGE READ MARK KARO
+// ✅ MARK MESSAGE AS READ
 // PUT /api/messages/read/:userId
 router.put("/read/:userId", protect, async (req, res) => {
     try {
@@ -53,7 +53,7 @@ router.put("/read/:userId", protect, async (req, res) => {
             { isRead: true }
         );
 
-        return res.json({ message: "Messages read marked ✅" });
+        return res.json({ message: "Messages marked as read ✅" });
 
     } catch (error) {
         return res.status(500).json({ message: error.message });

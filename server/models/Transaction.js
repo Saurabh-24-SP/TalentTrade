@@ -26,6 +26,7 @@ const transactionSchema = new mongoose.Schema(
             enum: ["pending", "accepted", "completed", "cancelled", "disputed"],
             default: "pending",
         },
+        creditsLocked: { type: Boolean, default: false },
         completedAt: { type: Date },
         isFlagged: { type: Boolean, default: false },
         fraudReason: { type: String, default: "" },

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { GlassCard, PageShell, PremiumButton, Reveal } from "../components/PremiumMotion";
 
 export default function Login() {
     const [form, setForm] = useState({ email: "", password: "" });
@@ -24,65 +25,62 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow p-8 w-full max-w-md border border-gray-100">
+        <PageShell>
+            <div className="flex min-h-screen items-center justify-center px-4 py-10">
+                <Reveal className="w-full max-w-md">
+                    <GlassCard className="p-8 md:p-10">
 
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl mb-2">⏰</h1>
-                    <h2 className="text-2xl font-bold text-gray-800">Welcome Back</h2>
-                    <p className="text-gray-500 text-sm mt-1">Login to your TalentTradeaccount</p>
-                </div>
+                        <div className="text-center">
+                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-600 to-sky-500 text-2xl text-white shadow-lg shadow-indigo-500/25">⏰</div>
+                            <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-900">Welcome back</h2>
+                            <p className="mt-2 text-sm text-slate-500">Login to your TalentTrade account.</p>
+                        </div>
 
-                {/* Error */}
-                {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm mb-4">
-                        {error}
-                    </div>
-                )}
+                        {error && (
+                            <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                {error}
+                            </div>
+                        )}
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
-                        <input
-                            type="email"
-                            placeholder="you@email.com"
-                            value={form.email}
-                            onChange={(e) => setForm({ ...form, email: e.target.value })}
-                            required
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-                        />
-                    </div>
+                        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                            <div>
+                                <label className="mb-1 block text-sm font-semibold text-slate-700">Email</label>
+                                <input
+                                    type="email"
+                                    placeholder="you@email.com"
+                                    value={form.email}
+                                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                    required
+                                    className="premium-input"
+                                />
+                            </div>
 
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
-                        <input
-                            type="password"
-                            placeholder="••••••••"
-                            value={form.password}
-                            onChange={(e) => setForm({ ...form, password: e.target.value })}
-                            required
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-                        />
-                    </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-semibold text-slate-700">Password</label>
+                                <input
+                                    type="password"
+                                    placeholder="••••••••"
+                                    value={form.password}
+                                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                    required
+                                    className="premium-input"
+                                />
+                            </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition"
-                    >
-                        {loading ? "Logging in..." : "Login"}
-                    </button>
-                </form>
+                            <PremiumButton type="submit" disabled={loading} className="w-full py-3">
+                                {loading ? "Logging in..." : "Login"}
+                            </PremiumButton>
+                        </form>
 
-                <p className="text-center text-sm text-gray-500 mt-6">
-                    No account?{" "}
-                    <Link to="/register" className="text-indigo-600 font-semibold hover:underline">
-                        Register here
-                    </Link>
-                </p>
+                        <p className="mt-6 text-center text-sm text-slate-500">
+                            No account?{" "}
+                            <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
+                                Register here
+                            </Link>
+                        </p>
+                    </GlassCard>
+                </Reveal>
             </div>
-        </div>
+        </PageShell>
     );
 }

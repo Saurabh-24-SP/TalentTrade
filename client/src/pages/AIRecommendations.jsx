@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import API from "../utils/api";
 import Navbar from "../components/Navbar";
+import { GlassCard, PageShell, Reveal, SectionHeading } from "../components/PremiumMotion";
 
 export default function AIRecommendations() {
     const [recommendations, setRecommendations] = useState([]);
@@ -36,81 +37,65 @@ export default function AIRecommendations() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <PageShell>
             <Navbar />
 
-            <div className="max-w-5xl mx-auto px-4 py-8">
+            <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+                <Reveal>
+                    <div className="mb-8">
+                        <SectionHeading
+                            eyebrow="AI"
+                            title="AI features"
+                            description="Smart recommendations powered by Groq AI and presented with a premium, modern layout."
+                        />
+                    </div>
+                </Reveal>
 
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-1">🤖 AI Features</h1>
-                    <p className="text-gray-500">Smart recommendations powered by Groq AI</p>
-                </div>
-
-                {/* AI Recommendations */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
-                    <h2 className="text-xl font-bold text-gray-800 mb-1">
-                        ✨ Recommended For You
-                    </h2>
-                    <p className="text-gray-400 text-sm mb-5">
-                        Based on your skills and profile
-                    </p>
+                <GlassCard className="mb-8 p-6">
+                    <h2 className="mb-1 text-xl font-bold text-slate-900">✨ Recommended For You</h2>
+                    <p className="mb-5 text-sm text-slate-400">Based on your skills and profile</p>
 
                     {loading ? (
-                        <div className="text-center py-8 text-gray-400">
-                            AI is finding best matches for you...
-                        </div>
+                        <div className="py-8 text-center text-slate-400">AI is finding best matches for you...</div>
                     ) : recommendations.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400">
-                            No recommendations found. Add more skills to your profile!
-                        </div>
+                        <div className="py-8 text-center text-slate-400">No recommendations found. Add more skills to your profile!</div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {recommendations.map((rec, i) => (
-                                <div key={i} className="border border-indigo-100 bg-indigo-50 rounded-xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
-                                            🤖 AI Pick
-                                        </span>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                            {recommendations.map((recommendation, index) => (
+                                <div key={index} className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-4">
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">🤖 AI Pick</span>
                                     </div>
-                                    <h3 className="font-bold text-gray-800 text-sm mb-1">{rec.title}</h3>
-                                    <p className="text-gray-500 text-xs mb-3 leading-relaxed">{rec.reason}</p>
-                                    <Link
-                                        to={`/services/${rec.id}`}
-                                        className="text-indigo-600 text-xs font-semibold hover:underline"
-                                    >
+                                    <h3 className="mb-1 text-sm font-bold text-slate-900">{recommendation.title}</h3>
+                                    <p className="mb-3 text-xs leading-relaxed text-slate-500">{recommendation.reason}</p>
+                                    <Link to={`/services/${recommendation.id}`} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
                                         View Service →
                                     </Link>
                                 </div>
                             ))}
                         </div>
                     )}
-                </div>
+                </GlassCard>
 
-                {/* AI Skill Matching */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
-                    <h2 className="text-xl font-bold text-gray-800 mb-1">
-                        🎯 AI Skill Matching
-                    </h2>
-                    <p className="text-gray-400 text-sm mb-5">
-                        Find the best provider for any service
-                    </p>
+                <GlassCard className="mb-8 p-6">
+                    <h2 className="mb-1 text-xl font-bold text-slate-900">🎯 AI Skill Matching</h2>
+                    <p className="mb-5 text-sm text-slate-400">Find the best provider for any service</p>
 
-                    <div className="flex gap-3 mb-5">
+                    <div className="mb-5 flex gap-3">
                         <select
                             value={serviceId}
                             onChange={(e) => setServiceId(e.target.value)}
-                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                            className="premium-select flex-1"
                         >
                             <option value="">Select a service...</option>
-                            {services.map((s) => (
-                                <option key={s._id} value={s._id}>{s.title}</option>
+                            {services.map((service) => (
+                                <option key={service._id} value={service._id}>{service.title}</option>
                             ))}
                         </select>
                         <button
                             onClick={handleMatch}
                             disabled={matchLoading || !serviceId}
-                            className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+                            className="premium-button px-6 py-2 text-sm disabled:opacity-50"
                         >
                             {matchLoading ? "Matching..." : "Find Match 🎯"}
                         </button>
@@ -118,30 +103,25 @@ export default function AIRecommendations() {
 
                     {matches.length > 0 && (
                         <div className="space-y-3">
-                            {matches.map((match, i) => (
-                                <div key={i} className="border border-gray-100 rounded-xl p-4 flex justify-between items-center">
+                            {matches.map((match, index) => (
+                                <div key={index} className="flex items-center justify-between rounded-3xl border border-slate-200 bg-white/70 p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center">
-                                            {match.name?.[0]?.toUpperCase()}
-                                        </div>
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-sky-500 font-bold text-white">{match.name?.[0]?.toUpperCase()}</div>
                                         <div>
-                                            <p className="font-bold text-gray-800 text-sm">{match.name}</p>
-                                            <p className="text-gray-400 text-xs">{match.reason}</p>
+                                            <p className="text-sm font-bold text-slate-900">{match.name}</p>
+                                            <p className="text-xs text-slate-400">{match.reason}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-2xl font-extrabold text-indigo-600">
-                                            {match.score}
-                                        </div>
-                                        <div className="text-xs text-gray-400">/ 10</div>
+                                        <div className="text-2xl font-extrabold text-indigo-600">{match.score}</div>
+                                        <div className="text-xs text-slate-400">/ 10</div>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
-                </div>
-
+                </GlassCard>
             </div>
-        </div>
+        </PageShell>
     );
 }

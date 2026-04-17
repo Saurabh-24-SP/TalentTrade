@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 
 const toastStyles = {
     success: "bg-green-50 border-green-200 text-green-700",
@@ -21,11 +22,16 @@ export function Toast({ message, type = "success", onClose }) {
     }, [onClose]);
 
     return (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl border shadow-lg text-sm font-medium animate-fade-in ${toastStyles[type]}`}>
-            <span>{toastIcons[type]}</span>
+        <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            className={`fixed right-6 top-6 z-50 flex items-center gap-3 rounded-2xl border px-5 py-3 text-sm font-medium shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl ${toastStyles[type]}`}
+        >
+            <span className="text-base">{toastIcons[type]}</span>
             <span>{message}</span>
-            <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100">✕</button>
-        </div>
+            <button onClick={onClose} className="ml-1 opacity-60 transition hover:opacity-100">✕</button>
+        </motion.div>
     );
 }
 
