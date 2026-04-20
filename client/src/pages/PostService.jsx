@@ -14,6 +14,7 @@ export default function PostService() {
         hoursRequired: 1,
         tags: "",
         videoUrl: "",
+        whatsappNumber: "",
         liveMeetingAvailable: false,
         liveMeetingPlatform: "",
         liveMeetingNote: "",
@@ -41,6 +42,7 @@ export default function PostService() {
                 hoursRequired: form.hoursRequired,
                 tags,
                 videoUrl: form.videoUrl,
+                whatsappNumber: form.whatsappNumber,
                 liveMeeting: {
                     available: form.liveMeetingAvailable,
                     platform: form.liveMeetingPlatform,
@@ -192,6 +194,21 @@ export default function PostService() {
                                     className="premium-input"
                                 />
                                 <p className="mt-2 text-xs text-slate-500">Add a demo/intro video link for this service.</p>
+                            </div>
+
+                            {/* WhatsApp */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                    WhatsApp Number <span className="text-gray-400 font-normal">(optional)</span>
+                                </label>
+                                <input
+                                    type="tel"
+                                    placeholder="e.g. +91 98765 43210"
+                                    value={form.whatsappNumber}
+                                    onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })}
+                                    className="premium-input"
+                                />
+                                <p className="mt-2 text-xs text-slate-500">Buyers can contact you on WhatsApp from the service page.</p>
                             </div>
 
                             {/* Upload content */}

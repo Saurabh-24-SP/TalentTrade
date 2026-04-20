@@ -29,6 +29,7 @@ const serviceSchema = new mongoose.Schema(
             note: { type: String, default: "" },
         },
         videoUrl: { type: String, default: "", trim: true },
+        whatsappNumber: { type: String, default: "", trim: true },
         liveMeeting: {
             available: { type: Boolean, default: false },
             platform: { type: String, default: "", trim: true },

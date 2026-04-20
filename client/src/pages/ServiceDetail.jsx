@@ -24,6 +24,13 @@ const getYouTubeEmbedUrl = (rawUrl = "") => {
     }
 };
 
+const buildWhatsAppLink = (rawNumber = "") => {
+    const digits = String(rawNumber || "").replace(/[^0-9]/g, "");
+    if (!digits) return "";
+    const text = encodeURIComponent("Hi! I'm interested in your TalentTrade service.");
+    return `https://wa.me/${digits}?text=${text}`;
+};
+
 function StarRating({ value = 0 }) {
     return (
         <div className="flex items-center gap-1 text-amber-400">
@@ -124,6 +131,7 @@ export default function ServiceDetail() {
     const [error, setError] = useState("");
     const [selectedImage, setSelectedImage] = useState("");
     const [videoUrlDraft, setVideoUrlDraft] = useState("");
+    const [whatsappDraft, setWhatsappDraft] = useState("");
     const [imageFiles, setImageFiles] = useState([]);
     const [resourceFiles, setResourceFiles] = useState([]);
     const [contentBusy, setContentBusy] = useState(false);
@@ -139,6 +147,7 @@ export default function ServiceDetail() {
                 const firstImage = res.data.images?.[0]?.url || res.data.image || "";
                 setSelectedImage(firstImage);
                 setVideoUrlDraft(res.data.videoUrl || "");
+                setWhatsappDraft(res.data.whatsappNumber || "");
             })
             .catch((err) => console.error(err))
             .finally(() => setLoading(false));
@@ -245,6 +254,11 @@ export default function ServiceDetail() {
     const completedJobs = service.providerStats?.completedJobsCount || 0;
     const similarServices = service.similarServices || [];
     const mainImage = selectedImage || gallery[0]?.url || service.image || "";
+    const whatsappLink = buildWhatsAppLink(service.whatsappNumber);
+    const attachments = Array.isArray(service.attachments) ? service.attachments : [];
+    const attachmentVideos = attachments.filter((a) => a?.kind === "video");
+    const attachmentPdfs = attachments.filter((a) => a?.kind === "pdf");
+    const attachmentFiles = attachments.filter((a) => !a?.kind || a?.kind === "file");
 
     const syncSelectedImage = (nextImages) => {
         const nextGallery = (nextImages || []).filter((img) => img?.url);
@@ -264,6 +278,23 @@ export default function ServiceDetail() {
             setVideoUrlDraft(savedUrl);
         } catch (err) {
             setContentError(err.response?.data?.message || "Failed to update video link");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const saveWhatsAppNumber = async (nextValue) => {
+        if (!isOwner) return;
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const payloadNumber = typeof nextValue === "string" ? nextValue : whatsappDraft;
+            const res = await API.put(`/services/update/${id}`, { whatsappNumber: payloadNumber });
+            const savedNumber = res.data?.whatsappNumber ?? payloadNumber;
+            setService((prev) => (prev ? { ...prev, whatsappNumber: savedNumber } : prev));
+            setWhatsappDraft(savedNumber);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Failed to update WhatsApp number");
         } finally {
             setContentBusy(false);
         }
@@ -437,32 +468,66 @@ export default function ServiceDetail() {
 
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-5">
-                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Video link</p>
-                                                <input
-                                                    type="url"
-                                                    placeholder="https://youtube.com/watch?v=... (optional)"
-                                                    value={videoUrlDraft}
-                                                    disabled={contentBusy}
-                                                    onChange={(e) => setVideoUrlDraft(e.target.value)}
-                                                    className="premium-input mt-3"
-                                                />
-                                                <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => saveVideoLink()}
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Links</p>
+
+                                                <div className="mt-4">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">WhatsApp</p>
+                                                    <input
+                                                        type="tel"
+                                                        placeholder="e.g. +91 98765 43210 (optional)"
+                                                        value={whatsappDraft}
                                                         disabled={contentBusy}
-                                                        className="premium-button px-5 py-2.5 text-xs"
-                                                    >
-                                                        Save
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => saveVideoLink("")}
+                                                        onChange={(e) => setWhatsappDraft(e.target.value)}
+                                                        className="premium-input mt-2"
+                                                    />
+                                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => saveWhatsAppNumber()}
+                                                            disabled={contentBusy}
+                                                            className="premium-button px-5 py-2.5 text-xs"
+                                                        >
+                                                            Save
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => saveWhatsAppNumber("")}
+                                                            disabled={contentBusy}
+                                                            className="premium-button premium-button-ghost px-5 py-2.5 text-xs"
+                                                        >
+                                                            Clear
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-5">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">YouTube video</p>
+                                                    <input
+                                                        type="url"
+                                                        placeholder="https://youtube.com/watch?v=... (optional)"
+                                                        value={videoUrlDraft}
                                                         disabled={contentBusy}
-                                                        className="premium-button premium-button-ghost px-5 py-2.5 text-xs"
-                                                    >
-                                                        Clear
-                                                    </button>
+                                                        onChange={(e) => setVideoUrlDraft(e.target.value)}
+                                                        className="premium-input mt-2"
+                                                    />
+                                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => saveVideoLink()}
+                                                            disabled={contentBusy}
+                                                            className="premium-button px-5 py-2.5 text-xs"
+                                                        >
+                                                            Save
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => saveVideoLink("")}
+                                                            disabled={contentBusy}
+                                                            className="premium-button premium-button-ghost px-5 py-2.5 text-xs"
+                                                        >
+                                                            Clear
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -610,7 +675,7 @@ export default function ServiceDetail() {
                             </Reveal>
                         )}
 
-                        {service.attachments?.length > 0 && (
+                        {attachments.length > 0 && (
                             <Reveal delay={0.09}>
                                 <GlassCard className="p-6 md:p-8">
                                     <SectionHeading
@@ -618,33 +683,89 @@ export default function ServiceDetail() {
                                         title="Uploaded content"
                                         description="PDFs and recorded videos shared by the provider."
                                     />
-                                    <div className="mt-6 space-y-3">
-                                        {service.attachments.map((item) => (
-                                            <div key={item.publicId || item.url} className="rounded-3xl border border-slate-200/70 bg-white/85 p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
-                                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{getReadableFileLabel(item)}</p>
-                                                        <p className="mt-1 truncate text-sm font-semibold text-slate-900">{item.originalName || item.url}</p>
-                                                    </div>
-                                                    <a
-                                                        href={item.url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="premium-button premium-button-ghost inline-flex items-center justify-center px-4 py-2 text-xs"
-                                                    >
-                                                        Open
-                                                    </a>
-                                                </div>
-
-                                                {item.kind === "video" && (
-                                                    <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200/70 bg-white">
-                                                        <div className="aspect-video">
-                                                            <video src={item.url} controls className="h-full w-full" />
+                                    <div className="mt-6 space-y-5">
+                                        {attachmentVideos.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Videos</p>
+                                                <div className="mt-3 space-y-3">
+                                                    {attachmentVideos.map((item) => (
+                                                        <div key={item.publicId || item.url} className="rounded-3xl border border-slate-200/70 bg-white/85 p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+                                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Video</p>
+                                                                    <p className="mt-1 truncate text-sm font-semibold text-slate-900">{item.originalName || item.url}</p>
+                                                                </div>
+                                                                <a
+                                                                    href={item.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="premium-button premium-button-ghost inline-flex items-center justify-center px-4 py-2 text-xs"
+                                                                >
+                                                                    Open
+                                                                </a>
+                                                            </div>
+                                                            <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200/70 bg-white">
+                                                                <div className="aspect-video">
+                                                                    <video src={item.url} controls className="h-full w-full" />
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    ))}
+                                                </div>
                                             </div>
-                                        ))}
+                                        )}
+
+                                        {attachmentPdfs.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">PDFs</p>
+                                                <div className="mt-3 space-y-3">
+                                                    {attachmentPdfs.map((item) => (
+                                                        <div key={item.publicId || item.url} className="rounded-3xl border border-slate-200/70 bg-white/85 p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+                                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">PDF</p>
+                                                                    <p className="mt-1 truncate text-sm font-semibold text-slate-900">{item.originalName || item.url}</p>
+                                                                </div>
+                                                                <a
+                                                                    href={item.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="premium-button premium-button-ghost inline-flex items-center justify-center px-4 py-2 text-xs"
+                                                                >
+                                                                    Open
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {attachmentFiles.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Files</p>
+                                                <div className="mt-3 space-y-3">
+                                                    {attachmentFiles.map((item) => (
+                                                        <div key={item.publicId || item.url} className="rounded-3xl border border-slate-200/70 bg-white/85 p-4 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+                                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">File</p>
+                                                                    <p className="mt-1 truncate text-sm font-semibold text-slate-900">{item.originalName || item.url}</p>
+                                                                </div>
+                                                                <a
+                                                                    href={item.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="premium-button premium-button-ghost inline-flex items-center justify-center px-4 py-2 text-xs"
+                                                                >
+                                                                    Open
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </GlassCard>
                             </Reveal>
@@ -808,6 +929,17 @@ export default function ServiceDetail() {
                                             >
                                                 Chat with Provider
                                             </button>
+
+                                            {whatsappLink && (
+                                                <a
+                                                    href={whatsappLink}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"
+                                                >
+                                                    WhatsApp
+                                                </a>
+                                            )}
                                             <button
                                                 onClick={handleVideoMeeting}
                                                 className="premium-button premium-button-ghost w-full justify-center px-5 py-3 text-sm"

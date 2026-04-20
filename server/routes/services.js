@@ -257,7 +257,7 @@ router.post("/:id/save", protect, async (req, res) => {
 // POST /api/services/create
 router.post("/create", protect, async (req, res) => {
     try {
-        const { title, description, category, hoursRequired, tags, location, image, images, availability, videoUrl, liveMeeting } = req.body;
+        const { title, description, category, hoursRequired, tags, location, image, images, availability, videoUrl, whatsappNumber, liveMeeting } = req.body;
 
         if (!title || !description || !category || !hoursRequired) {
             return res.status(400).json({ message: "Title, description, category, hoursRequired required" });
@@ -275,6 +275,7 @@ router.post("/create", protect, async (req, res) => {
             images: Array.isArray(images) ? images : [],
             availability: buildAvailability(availability),
             videoUrl: typeof videoUrl === "string" ? videoUrl.trim() : "",
+            whatsappNumber: typeof whatsappNumber === "string" ? whatsappNumber.trim() : "",
             liveMeeting: buildLiveMeeting(liveMeeting),
         });
 
@@ -300,11 +301,11 @@ router.put("/update/:id", protect, async (req, res) => {
             return res.status(403).json({ message: "Not authorized" });
         }
 
-        const updated = await Service.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true }
-        );
+        const updates = { ...req.body };
+        if (typeof updates.videoUrl === "string") updates.videoUrl = updates.videoUrl.trim();
+        if (typeof updates.whatsappNumber === "string") updates.whatsappNumber = updates.whatsappNumber.trim();
+
+        const updated = await Service.findByIdAndUpdate(req.params.id, updates, { new: true });
 
         return res.json(updated);
 

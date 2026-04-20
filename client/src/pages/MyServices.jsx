@@ -10,6 +10,7 @@ export default function MyServices() {
     const [loading, setLoading] = useState(true);
     const [activeServiceId, setActiveServiceId] = useState(null);
     const [videoUrlDraft, setVideoUrlDraft] = useState("");
+    const [whatsappDraft, setWhatsappDraft] = useState("");
     const [imageFiles, setImageFiles] = useState([]);
     const [resourceFiles, setResourceFiles] = useState([]);
     const [contentBusy, setContentBusy] = useState(false);
@@ -44,6 +45,7 @@ export default function MyServices() {
 
     const resetDraft = () => {
         setVideoUrlDraft("");
+        setWhatsappDraft("");
         setImageFiles([]);
         setResourceFiles([]);
         setContentError("");
@@ -56,6 +58,7 @@ export default function MyServices() {
             if (next) {
                 const current = services.find((s) => s._id === next);
                 setVideoUrlDraft(current?.videoUrl || "");
+                setWhatsappDraft(current?.whatsappNumber || "");
             }
             return next;
         });
@@ -75,6 +78,29 @@ export default function MyServices() {
         } finally {
             setContentBusy(false);
         }
+    };
+
+    const saveWhatsAppNumber = async (serviceId, nextValue) => {
+        setContentBusy(true);
+        setContentError("");
+        try {
+            const payloadNumber = typeof nextValue === "string" ? nextValue : whatsappDraft;
+            const res = await API.put(`/services/update/${serviceId}`, { whatsappNumber: payloadNumber });
+            const savedNumber = res.data?.whatsappNumber ?? payloadNumber;
+            setServices((prev) => prev.map((s) => (s._id === serviceId ? { ...s, whatsappNumber: savedNumber } : s)));
+            setWhatsappDraft(savedNumber);
+        } catch (err) {
+            setContentError(err.response?.data?.message || "Failed to update WhatsApp number");
+        } finally {
+            setContentBusy(false);
+        }
+    };
+
+    const buildWhatsAppLink = (rawNumber = "") => {
+        const digits = String(rawNumber || "").replace(/[^0-9]/g, "");
+        if (!digits) return "";
+        const text = encodeURIComponent("Hi! I'm interested in your TalentTrade service.");
+        return `https://wa.me/${digits}?text=${text}`;
     };
 
     const uploadImages = async (serviceId) => {
@@ -214,7 +240,7 @@ export default function MyServices() {
                                             onClick={() => toggleManager(service._id)}
                                             className="rounded-2xl bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
                                         >
-                                            {activeServiceId === service._id ? "Hide content" : "Manage content"}
+                                            {activeServiceId === service._id ? "Close" : "Create Post"}
                                         </button>
                                         <button
                                             onClick={() => handleDelete(service._id)}
@@ -229,7 +255,7 @@ export default function MyServices() {
                                     <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 backdrop-blur-xl">
                                         <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 px-5 py-4">
                                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Content manager</p>
-                                            <p className="mt-1 text-sm font-semibold text-slate-900">Add / edit / delete your media for this service</p>
+                                            <p className="mt-1 text-sm font-semibold text-slate-900">Create post: add / edit / delete your media for this service</p>
                                         </div>
 
                                         <div className="p-5">
@@ -241,32 +267,66 @@ export default function MyServices() {
 
                                             <div className="grid gap-4 md:grid-cols-2">
                                                 <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-4">
-                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Video link</p>
-                                                    <input
-                                                        type="url"
-                                                        placeholder="https://youtube.com/watch?v=... (optional)"
-                                                        value={videoUrlDraft}
-                                                        disabled={contentBusy}
-                                                        onChange={(e) => setVideoUrlDraft(e.target.value)}
-                                                        className="premium-input mt-3"
-                                                    />
-                                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => saveVideoLink(service._id)}
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Links</p>
+
+                                                    <div className="mt-4">
+                                                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">WhatsApp</p>
+                                                        <input
+                                                            type="tel"
+                                                            placeholder="e.g. +91 98765 43210"
+                                                            value={whatsappDraft}
                                                             disabled={contentBusy}
-                                                            className="premium-button px-5 py-2.5 text-xs"
-                                                        >
-                                                            Save
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => saveVideoLink(service._id, "")}
+                                                            onChange={(e) => setWhatsappDraft(e.target.value)}
+                                                            className="premium-input mt-2"
+                                                        />
+                                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => saveWhatsAppNumber(service._id)}
+                                                                disabled={contentBusy}
+                                                                className="premium-button px-5 py-2.5 text-xs"
+                                                            >
+                                                                Save
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => saveWhatsAppNumber(service._id, "")}
+                                                                disabled={contentBusy}
+                                                                className="premium-button premium-button-ghost px-5 py-2.5 text-xs"
+                                                            >
+                                                                Clear
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-5">
+                                                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">YouTube video</p>
+                                                        <input
+                                                            type="url"
+                                                            placeholder="https://youtube.com/watch?v=..."
+                                                            value={videoUrlDraft}
                                                             disabled={contentBusy}
-                                                            className="premium-button premium-button-ghost px-5 py-2.5 text-xs"
-                                                        >
-                                                            Clear
-                                                        </button>
+                                                            onChange={(e) => setVideoUrlDraft(e.target.value)}
+                                                            className="premium-input mt-2"
+                                                        />
+                                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => saveVideoLink(service._id)}
+                                                                disabled={contentBusy}
+                                                                className="premium-button px-5 py-2.5 text-xs"
+                                                            >
+                                                                Save
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => saveVideoLink(service._id, "")}
+                                                                disabled={contentBusy}
+                                                                className="premium-button premium-button-ghost px-5 py-2.5 text-xs"
+                                                            >
+                                                                Clear
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -325,6 +385,63 @@ export default function MyServices() {
                                                 </div>
                                             </div>
 
+                                            {(service.whatsappNumber || service.videoUrl) && (
+                                                <div className="mt-6">
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current links</p>
+                                                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                                        {service.whatsappNumber && (
+                                                            <div className="rounded-3xl border border-slate-200/70 bg-white px-4 py-3">
+                                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">WhatsApp</p>
+                                                                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{service.whatsappNumber}</p>
+                                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                                    <a
+                                                                        href={buildWhatsAppLink(service.whatsappNumber)}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="premium-button premium-button-ghost inline-flex items-center justify-center px-4 py-2 text-xs"
+                                                                    >
+                                                                        Open
+                                                                    </a>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => saveWhatsAppNumber(service._id, "")}
+                                                                        disabled={contentBusy}
+                                                                        className="premium-button premium-button-ghost px-4 py-2 text-xs text-rose-600"
+                                                                    >
+                                                                        Remove
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {service.videoUrl && (
+                                                            <div className="rounded-3xl border border-slate-200/70 bg-white px-4 py-3">
+                                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">YouTube</p>
+                                                                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{service.videoUrl}</p>
+                                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                                    <a
+                                                                        href={service.videoUrl}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="premium-button premium-button-ghost inline-flex items-center justify-center px-4 py-2 text-xs"
+                                                                    >
+                                                                        Open
+                                                                    </a>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => saveVideoLink(service._id, "")}
+                                                                        disabled={contentBusy}
+                                                                        className="premium-button premium-button-ghost px-4 py-2 text-xs text-rose-600"
+                                                                    >
+                                                                        Remove
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {Array.isArray(service.images) && service.images.length > 0 && (
                                                 <div className="mt-6">
                                                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current images</p>
@@ -347,30 +464,90 @@ export default function MyServices() {
                                             )}
 
                                             {Array.isArray(service.attachments) && service.attachments.length > 0 && (
-                                                <div className="mt-6">
-                                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current files</p>
-                                                    <div className="mt-3 space-y-2">
-                                                        {service.attachments.map((item) => (
-                                                            <div key={item.publicId || item.url} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                                                                <a
-                                                                    href={item.url}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700 hover:text-indigo-700"
-                                                                >
-                                                                    {item.originalName || item.url}
-                                                                </a>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => deleteServiceAttachment(service._id, item.publicId)}
-                                                                    disabled={contentBusy}
-                                                                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-60"
-                                                                >
-                                                                    Remove
-                                                                </button>
+                                                <div className="mt-6 space-y-4">
+                                                    {service.attachments.some((a) => a?.kind === "video") && (
+                                                        <div>
+                                                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Videos</p>
+                                                            <div className="mt-3 space-y-2">
+                                                                {service.attachments.filter((a) => a?.kind === "video").map((item) => (
+                                                                    <div key={item.publicId || item.url} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                                                                        <a
+                                                                            href={item.url}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700 hover:text-indigo-700"
+                                                                        >
+                                                                            {item.originalName || item.url}
+                                                                        </a>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => deleteServiceAttachment(service._id, item.publicId)}
+                                                                            disabled={contentBusy}
+                                                                            className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-60"
+                                                                        >
+                                                                            Remove
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
                                                             </div>
-                                                        ))}
-                                                    </div>
+                                                        </div>
+                                                    )}
+
+                                                    {service.attachments.some((a) => a?.kind === "pdf") && (
+                                                        <div>
+                                                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">PDFs</p>
+                                                            <div className="mt-3 space-y-2">
+                                                                {service.attachments.filter((a) => a?.kind === "pdf").map((item) => (
+                                                                    <div key={item.publicId || item.url} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                                                                        <a
+                                                                            href={item.url}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700 hover:text-indigo-700"
+                                                                        >
+                                                                            {item.originalName || item.url}
+                                                                        </a>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => deleteServiceAttachment(service._id, item.publicId)}
+                                                                            disabled={contentBusy}
+                                                                            className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-60"
+                                                                        >
+                                                                            Remove
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {service.attachments.some((a) => !a?.kind || a?.kind === "file") && (
+                                                        <div>
+                                                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Files</p>
+                                                            <div className="mt-3 space-y-2">
+                                                                {service.attachments.filter((a) => !a?.kind || a?.kind === "file").map((item) => (
+                                                                    <div key={item.publicId || item.url} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                                                                        <a
+                                                                            href={item.url}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700 hover:text-indigo-700"
+                                                                        >
+                                                                            {item.originalName || item.url}
+                                                                        </a>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => deleteServiceAttachment(service._id, item.publicId)}
+                                                                            disabled={contentBusy}
+                                                                            className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-60"
+                                                                        >
+                                                                            Remove
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
